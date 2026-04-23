@@ -7,6 +7,7 @@ import GeneratePlanButton from "@/components/GeneratePlanButton";
 import MealPlanWeek from "@/components/MealPlanWeek";
 import { MealPlan, WeightEntry } from "@/types";
 import { calculateWeightLossCalories } from "@/lib/calories";
+import InstallBanner from "@/components/InstallBanner";
 
 export default function Home() {
   const [weights, setWeights] = useState<WeightEntry[]>([]);
@@ -164,6 +165,7 @@ export default function Home() {
           </div>
         )}
       </main>
+      <InstallBanner />
     </div>
   );
 }
