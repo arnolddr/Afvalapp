@@ -1,0 +1,43 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model WeightEntry {
+  id        Int      @id @default(autoincrement())
+  weight    Float
+  unit      String   @default("kg")
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+}
+
+model MealPlan {
+  id             Int      @id @default(autoincrement())
+  weekStart      DateTime
+  weekEnd        DateTime
+  weight         Float
+  targetCalories Int
+  generatedAt    DateTime @default(now())
+  meals          Meal[]
+}
+
+model Meal {
+  id           Int      @id @default(autoincrement())
+  mealPlanId   Int
+  mealPlan     MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  day          String
+  dayIndex     Int
+  type         String
+  name         String
+  description  String
+  calories     Int
+  protein      Int
+  carbs        Int
+  fat          Int
+  ingredients  String
+  instructions String
+}
