@@ -1,0 +1,14 @@
+services:
+  afvalapp:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - db_data:/data
+    environment:
+      - DATABASE_URL=file:/data/afvalapp.db
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    restart: unless-stopped
+
+volumes:
+  db_data:
