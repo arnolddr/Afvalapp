@@ -18,6 +18,7 @@ export interface MealData {
   fat: number;
   ingredients: string[];
   instructions: string[];
+  allCalories?: Record<string, number>;
 }
 
 export interface MealPlan {
@@ -28,6 +29,7 @@ export interface MealPlan {
   targetCalories: number;
   generatedAt: string;
   meals: MealData[];
+  allTargets?: Record<string, number>;
 }
 
 export interface GenerateMealPlanRequest {

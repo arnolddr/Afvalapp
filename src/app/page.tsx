@@ -188,7 +188,7 @@ export default function Home() {
                     ))}
                   </div>
                 )}
-                {currentPlan && <MealPlanWeek plan={currentPlan} />}
+                {currentPlan && <MealPlanWeek plan={currentPlan} activeProfile={profile} />}
               </div>
             )}
 

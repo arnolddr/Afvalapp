@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { scaleIngredient } from "@/lib/ingredients";
 import { weekSnacks } from "@/lib/snacks";
+import { calculateWeightLossCalories } from "@/lib/calories";
 
 const CATEGORIES: { label: string; keywords: RegExp[] }[] = [
   {
@@ -54,14 +55,38 @@ export async function GET() {
     .prepare("SELECT ingredients FROM Meal WHERE mealPlanId = ?")
     .all(plan.id as number) as { ingredients: string }[];
 
-  const servings = 2; // couple portions
+  // Calculate the combined ingredient scale factor for both people
+  // (each person's portion relative to the stored base, summed together)
+  interface ProfileRow { name: string; height: number; age: number; gender: string }
+  const profileRows = db
+    .prepare("SELECT name, height, age, gender FROM Profile ORDER BY id ASC")
+    .all() as ProfileRow[];
 
-  // Main menu ingredients (doubled for 2 people)
+  const storedTarget = plan.targetCalories as number;
+  let combinedFactor = 0;
+  for (const p of profileRows) {
+    const latest = db
+      .prepare("SELECT weight FROM WeightEntry WHERE profile = ? ORDER BY date DESC, id DESC LIMIT 1")
+      .get(p.name) as { weight: number } | undefined;
+    if (latest) {
+      const t = calculateWeightLossCalories(
+        latest.weight,
+        p.height ?? 170,
+        p.age ?? 35,
+        (p.gender ?? "man") as "man" | "vrouw"
+      );
+      combinedFactor += t / storedTarget;
+    }
+  }
+  // Fall back to 2 (one portion per person) when weight data is missing
+  if (combinedFactor < 0.5) combinedFactor = 2;
+
+  // Main menu ingredients scaled for both people combined
   const allIngredients: string[] = [];
   for (const meal of meals) {
     const parsed: string[] = JSON.parse(meal.ingredients);
     for (const ing of parsed) {
-      allIngredients.push(scaleIngredient(ing, servings));
+      allIngredients.push(scaleIngredient(ing, combinedFactor));
     }
   }
 
@@ -91,20 +116,13 @@ export async function GET() {
     if (!grouped[cat].includes(ing)) grouped[cat].push(ing);
   }
 
-  const categories = Object.entries(grouped).map(([label, items]) => ({
-    label,
-    items,
-  }));
-
+  const categories = Object.entries(grouped).map(([label, items]) => ({ label, items }));
   const order = CATEGORIES.map((c) => c.label).concat(["🛒 Overig"]);
   categories.sort((a, b) => order.indexOf(a.label) - order.indexOf(b.label));
 
   return NextResponse.json({
-    plan: {
-      weekStart: plan.weekStart,
-      weekEnd: plan.weekEnd,
-    },
-    servings,
+    plan: { weekStart: plan.weekStart, weekEnd: plan.weekEnd },
+    servings: Math.round(combinedFactor * 10) / 10,
     snackProfiles: snackProfiles.map((p) => p.name),
     categories,
   });

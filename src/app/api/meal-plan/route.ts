@@ -2,54 +2,71 @@ import { NextRequest, NextResponse } from "next/server";
 import db from "@/lib/db";
 import { calculateWeightLossCalories } from "@/lib/calories";
 
+interface ProfileRow {
+  name: string;
+  height: number;
+  age: number;
+  gender: string;
+}
+
 export async function GET(req: NextRequest) {
-  const profile = req.nextUrl.searchParams.get("profile") || "Ik";
+  const requestedProfile = req.nextUrl.searchParams.get("profile") || "Ik";
 
-  // Get latest weight and body data for this profile so we can recalculate daily
-  const latestEntry = db
-    .prepare("SELECT weight FROM WeightEntry WHERE profile = ? ORDER BY date DESC, id DESC LIMIT 1")
-    .get(profile) as { weight: number } | undefined;
+  // Calculate current calorie target for every profile that has weight data
+  const profileRows = db
+    .prepare("SELECT name, height, age, gender FROM Profile ORDER BY id ASC")
+    .all() as ProfileRow[];
 
-  const profileData = db
-    .prepare("SELECT height, age, gender FROM Profile WHERE name = ?")
-    .get(profile) as { height: number; age: number; gender: string } | undefined;
+  const allTargets: Record<string, number> = {};
+  for (const p of profileRows) {
+    const latest = db
+      .prepare("SELECT weight FROM WeightEntry WHERE profile = ? ORDER BY date DESC, id DESC LIMIT 1")
+      .get(p.name) as { weight: number } | undefined;
+    if (latest) {
+      allTargets[p.name] = calculateWeightLossCalories(
+        latest.weight,
+        p.height ?? 170,
+        p.age ?? 35,
+        (p.gender ?? "man") as "man" | "vrouw"
+      );
+    }
+  }
 
   const plans = db
     .prepare("SELECT * FROM MealPlan ORDER BY generatedAt DESC LIMIT 2")
     .all() as Record<string, unknown>[];
 
   const result = plans.map((plan) => {
+    const storedTarget = plan.targetCalories as number;
+    const myTarget = allTargets[requestedProfile] ?? storedTarget;
+    const myFactor = myTarget / storedTarget;
+
     const meals = db
       .prepare("SELECT * FROM Meal WHERE mealPlanId = ? ORDER BY dayIndex ASC, type ASC")
       .all(plan.id as number) as Record<string, unknown>[];
 
-    // Recalculate target based on today's weight; fall back to stored value
-    let targetCalories = plan.targetCalories as number;
-    let mealFactor = 1;
-
-    if (latestEntry && profileData) {
-      const newTarget = calculateWeightLossCalories(
-        latestEntry.weight,
-        profileData.height ?? 170,
-        profileData.age ?? 35,
-        (profileData.gender ?? "man") as "man" | "vrouw"
-      );
-      mealFactor = newTarget / targetCalories;
-      targetCalories = newTarget;
-    }
-
     return {
       ...plan,
-      targetCalories,
-      meals: meals.map((meal) => ({
-        ...meal,
-        calories: Math.round((meal.calories as number) * mealFactor),
-        protein: Math.round((meal.protein as number) * mealFactor),
-        carbs: Math.round((meal.carbs as number) * mealFactor),
-        fat: Math.round((meal.fat as number) * mealFactor),
-        ingredients: JSON.parse(meal.ingredients as string),
-        instructions: JSON.parse(meal.instructions as string),
-      })),
+      targetCalories: myTarget,
+      allTargets,
+      meals: meals.map((meal) => {
+        const storedCal = meal.calories as number;
+        // Per-profile calories for each meal
+        const allCalories: Record<string, number> = {};
+        for (const [name, t] of Object.entries(allTargets)) {
+          allCalories[name] = Math.round(storedCal * (t / storedTarget));
+        }
+        return {
+          ...meal,
+          calories: Math.round(storedCal * myFactor),
+          protein: Math.round((meal.protein as number) * myFactor),
+          carbs: Math.round((meal.carbs as number) * myFactor),
+          fat: Math.round((meal.fat as number) * myFactor),
+          allCalories,
+          ingredients: JSON.parse(meal.ingredients as string),
+          instructions: JSON.parse(meal.instructions as string),
+        };
+      }),
     };
   });
 
