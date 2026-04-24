@@ -36,7 +36,7 @@ export default function MealPlanWeek({ plan }: Props) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">
-            Weekmenu
+            Weekmenu <span className="text-sm font-normal text-gray-500">voor 2</span>
           </h2>
           <p className="text-sm text-gray-500">
             {weekStartDate.toLocaleDateString("nl-NL", { day: "numeric", month: "long" })}
@@ -48,7 +48,7 @@ export default function MealPlanWeek({ plan }: Props) {
           <p className="text-sm font-medium text-gray-900">
             {plan.targetCalories} kcal/dag
           </p>
-          <p className="text-xs text-gray-500">Doelstelling</p>
+          <p className="text-xs text-gray-500">Per persoon</p>
         </div>
       </div>
 

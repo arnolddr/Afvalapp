@@ -52,8 +52,9 @@ db.exec(`
   );
 
   CREATE TABLE IF NOT EXISTS Profile (
-    id   INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT    NOT NULL UNIQUE
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT    NOT NULL UNIQUE,
+    eatsSnacks INTEGER NOT NULL DEFAULT 0
   );
 `);
 
@@ -64,9 +65,14 @@ if (existingProfiles.count === 0) {
   db.prepare("INSERT INTO Profile (name) VALUES (?)").run("Vriendin");
 }
 
-// Safe migration: add profile column if missing (existing installs)
+// Safe migrations: add columns if missing (existing installs)
 try {
   db.exec("ALTER TABLE WeightEntry ADD COLUMN profile TEXT NOT NULL DEFAULT 'Ik'");
+} catch {
+  // column already exists
+}
+try {
+  db.exec("ALTER TABLE Profile ADD COLUMN eatsSnacks INTEGER NOT NULL DEFAULT 0");
 } catch {
   // column already exists
 }

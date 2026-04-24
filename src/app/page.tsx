@@ -9,6 +9,7 @@ import RecipesView from "@/components/RecipesView";
 import ShoppingList from "@/components/ShoppingList";
 import Navigation, { Tab } from "@/components/Navigation";
 import ProfileSelector from "@/components/ProfileSelector";
+import DailySnacks from "@/components/DailySnacks";
 import InstallBanner from "@/components/InstallBanner";
 import { MealPlan, WeightEntry } from "@/types";
 import { calculateWeightLossCalories } from "@/lib/calories";
@@ -20,6 +21,7 @@ export default function Home() {
   const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
   const [selectedPlanIdx, setSelectedPlanIdx] = useState(0);
   const [loadingData, setLoadingData] = useState(true);
+  const [snacksRefresh, setSnacksRefresh] = useState(0);
 
   const latestWeight = weights[0]?.weight ?? null;
   const isThursday = new Date().getDay() === 4;
@@ -79,7 +81,11 @@ export default function Home() {
         {/* Dashboard */}
         {tab === "dashboard" && (
           <>
-            <ProfileSelector activeProfile={profile} onChange={setProfile} />
+            <ProfileSelector
+              activeProfile={profile}
+              onChange={setProfile}
+              onSnackChange={() => setSnacksRefresh((n) => n + 1)}
+            />
 
             {latestWeight && tdee && (
               <div className="grid grid-cols-3 gap-3">
@@ -142,6 +148,8 @@ export default function Home() {
                 {currentPlan && <MealPlanWeek plan={currentPlan} />}
               </div>
             )}
+
+            {mealPlans.length > 0 && <DailySnacks refreshKey={snacksRefresh} />}
           </>
         )}
 

@@ -10,6 +10,8 @@ interface Category {
 interface ShoppingData {
   plan: { weekStart: string; weekEnd: string } | null;
   categories: Category[];
+  servings?: number;
+  snackProfiles?: string[];
 }
 
 export default function ShoppingList() {
@@ -22,7 +24,6 @@ export default function ShoppingList() {
       .then((r) => r.json())
       .then((d) => {
         setData(d);
-        // Restore checked state from localStorage
         const saved = localStorage.getItem("shopping-checked");
         if (saved) setChecked(JSON.parse(saved));
       })
@@ -65,11 +66,16 @@ export default function ShoppingList() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Boodschappenlijst</h2>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Boodschappenlijst <span className="text-sm font-normal text-gray-500">voor {data.servings ?? 2}</span>
+          </h2>
           <p className="text-sm text-gray-500">
             {new Date(data.plan.weekStart).toLocaleDateString("nl-NL", { day: "numeric", month: "long" })}
             {" – "}
             {new Date(data.plan.weekEnd).toLocaleDateString("nl-NL", { day: "numeric", month: "long" })}
+            {data.snackProfiles && data.snackProfiles.length > 0 && (
+              <span className="ml-1">· met snacks voor {data.snackProfiles.join(" & ")}</span>
+            )}
           </p>
         </div>
         <div className="text-right">
