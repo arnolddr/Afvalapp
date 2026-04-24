@@ -3,14 +3,22 @@ import db from "@/lib/db";
 import { generateMealPlan } from "@/lib/mealPlanGenerator";
 
 export async function POST(req: NextRequest) {
-  const { weight } = await req.json();
+  const { weight, profile = "Ik" } = await req.json();
 
   if (!weight || typeof weight !== "number" || weight < 20 || weight > 500) {
     return NextResponse.json({ error: "Ongeldig gewicht" }, { status: 400 });
   }
 
-  const { weekStart, weekEnd, targetCalories, meals } =
-    await generateMealPlan(weight);
+  const profileRow = db
+    .prepare("SELECT height, age, gender FROM Profile WHERE name = ?")
+    .get(profile) as { height: number; age: number; gender: string } | undefined;
+
+  const { weekStart, weekEnd, targetCalories, meals } = await generateMealPlan(
+    weight,
+    profileRow?.height ?? 170,
+    profileRow?.age ?? 35,
+    (profileRow?.gender ?? "man") as "man" | "vrouw"
+  );
 
   const plan = db
     .prepare(

@@ -5,11 +5,13 @@ import { MealPlan } from "@/types";
 
 interface Props {
   latestWeight: number | null;
+  profile: string;
   onPlanGenerated: (plan: MealPlan) => void;
 }
 
 export default function GeneratePlanButton({
   latestWeight,
+  profile,
   onPlanGenerated,
 }: Props) {
   const [loading, setLoading] = useState(false);
@@ -32,7 +34,7 @@ export default function GeneratePlanButton({
       const res = await fetch("/api/meal-plan/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ weight: weightToUse }),
+        body: JSON.stringify({ weight: weightToUse, profile }),
       });
       if (!res.ok) {
         const data = await res.json();

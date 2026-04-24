@@ -14,6 +14,14 @@ import InstallBanner from "@/components/InstallBanner";
 import { MealPlan, WeightEntry } from "@/types";
 import { calculateWeightLossCalories } from "@/lib/calories";
 
+interface ProfileData {
+  name: string;
+  eatsSnacks: boolean;
+  height: number;
+  age: number;
+  gender: string;
+}
+
 export default function Home() {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [profile, setProfile] = useState("Ik");
@@ -22,9 +30,34 @@ export default function Home() {
   const [selectedPlanIdx, setSelectedPlanIdx] = useState(0);
   const [loadingData, setLoadingData] = useState(true);
   const [snacksRefresh, setSnacksRefresh] = useState(0);
+  const [profilesData, setProfilesData] = useState<Record<string, ProfileData>>({});
 
   const latestWeight = weights[0]?.weight ?? null;
   const isThursday = new Date().getDay() === 4;
+
+  const activeProfileData = profilesData[profile];
+  const tdee = latestWeight
+    ? calculateWeightLossCalories(
+        latestWeight,
+        activeProfileData?.height ?? 170,
+        activeProfileData?.age ?? 35,
+        (activeProfileData?.gender ?? "man") as "man" | "vrouw"
+      )
+    : null;
+
+  function fetchProfiles() {
+    fetch("/api/profiles")
+      .then((r) => r.json())
+      .then((data: ProfileData[]) => {
+        const map: Record<string, ProfileData> = {};
+        for (const p of data) map[p.name] = p;
+        setProfilesData(map);
+      });
+  }
+
+  useEffect(() => {
+    fetchProfiles();
+  }, []);
 
   useEffect(() => {
     setLoadingData(true);
@@ -49,13 +82,16 @@ export default function Home() {
     setWeights((prev) => [newEntry, ...prev]);
   }
 
+  function handleWeightDeleted(id: number) {
+    setWeights((prev) => prev.filter((e) => e.id !== id));
+  }
+
   function handlePlanGenerated(plan: MealPlan) {
     setMealPlans((prev) => [plan, ...prev]);
     setSelectedPlanIdx(0);
   }
 
   const currentPlan = mealPlans[selectedPlanIdx];
-  const tdee = latestWeight ? calculateWeightLossCalories(latestWeight) : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -85,6 +121,7 @@ export default function Home() {
               activeProfile={profile}
               onChange={setProfile}
               onSnackChange={() => setSnacksRefresh((n) => n + 1)}
+              onProfileSettingsChange={fetchProfiles}
             />
 
             {latestWeight && tdee && (
@@ -105,11 +142,12 @@ export default function Home() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <WeightInput profile={profile} onWeightSaved={handleWeightSaved} />
-              <WeightHistory entries={weights} profile={profile} />
+              <WeightHistory entries={weights} profile={profile} onDelete={handleWeightDeleted} />
             </div>
 
             <GeneratePlanButton
               latestWeight={latestWeight}
+              profile={profile}
               onPlanGenerated={handlePlanGenerated}
             />
 

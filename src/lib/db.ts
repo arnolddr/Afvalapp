@@ -76,5 +76,20 @@ try {
 } catch {
   // column already exists
 }
+try {
+  db.exec("ALTER TABLE Profile ADD COLUMN height INTEGER NOT NULL DEFAULT 170");
+} catch {
+  // column already exists
+}
+try {
+  db.exec("ALTER TABLE Profile ADD COLUMN age INTEGER NOT NULL DEFAULT 35");
+} catch {
+  // column already exists
+}
+try {
+  db.exec("ALTER TABLE Profile ADD COLUMN gender TEXT NOT NULL DEFAULT 'man'");
+} catch {
+  // column already exists
+}
 
 export default db;

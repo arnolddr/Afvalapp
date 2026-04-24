@@ -1,16 +1,23 @@
-export function calculateTDEE(weightKg: number): number {
-  // Mifflin-St Jeor for sedentary lifestyle (conservative estimate for weight loss)
-  // Assumes average adult male (can be expanded with gender/height/age)
-  const bmr = 10 * weightKg + 6.25 * 170 - 5 * 35 + 5;
-  const tdee = bmr * 1.375; // lightly active
-  return Math.round(tdee);
+export function calculateTDEE(
+  weightKg: number,
+  heightCm = 170,
+  age = 35,
+  gender: "man" | "vrouw" = "man"
+): number {
+  // Mifflin-St Jeor BMR, lightly active multiplier
+  const genderOffset = gender === "man" ? 5 : -161;
+  const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + genderOffset;
+  return Math.round(bmr * 1.375);
 }
 
-export function calculateWeightLossCalories(weightKg: number): number {
-  const tdee = calculateTDEE(weightKg);
-  // 500 kcal deficit = ~0.5kg/week loss
-  const target = tdee - 500;
-  return Math.max(target, 1200); // never go below 1200
+export function calculateWeightLossCalories(
+  weightKg: number,
+  heightCm = 170,
+  age = 35,
+  gender: "man" | "vrouw" = "man"
+): number {
+  // 500 kcal deficit ≈ 0.5 kg/week loss, minimum 1200
+  return Math.max(calculateTDEE(weightKg, heightCm, age, gender) - 500, 1200);
 }
 
 export function calculateLunchDinnerSplit(totalCalories: number): {

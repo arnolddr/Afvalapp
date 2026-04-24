@@ -212,13 +212,18 @@ interface GeneratedMeal {
   instructions: string[];
 }
 
-export async function generateMealPlan(weightKg: number): Promise<{
+export async function generateMealPlan(
+  weightKg: number,
+  heightCm = 170,
+  age = 35,
+  gender: "man" | "vrouw" = "man"
+): Promise<{
   weekStart: Date;
   weekEnd: Date;
   targetCalories: number;
   meals: GeneratedMeal[];
 }> {
-  const targetCalories = calculateWeightLossCalories(weightKg);
+  const targetCalories = calculateWeightLossCalories(weightKg, heightCm, age, gender);
   const { lunch: lunchTarget, dinner: dinnerTarget } = calculateLunchDinnerSplit(targetCalories);
   const saturday = getNextSaturday();
   const weekDays = getWeekDays(saturday);
