@@ -210,6 +210,7 @@ interface GeneratedMeal {
   fat: number;
   ingredients: string[];
   instructions: string[];
+  baseCalories: number;
 }
 
 export async function generateMealPlan(
@@ -240,30 +241,20 @@ export async function generateMealPlan(
     const dinner = scaleCalories(dinners[i], dinnerTarget);
 
     meals.push({
-      day: DAYS_NL[i],
-      dayIndex: i,
-      type: "lunch",
-      name: lunch.name,
-      description: lunch.description,
-      calories: lunch.calories,
-      protein: lunch.protein,
-      carbs: lunch.carbs,
-      fat: lunch.fat,
-      ingredients: lunch.ingredients,
-      instructions: lunch.instructions,
+      day: DAYS_NL[i], dayIndex: i, type: "lunch",
+      name: lunch.name, description: lunch.description,
+      calories: lunch.calories, protein: lunch.protein,
+      carbs: lunch.carbs, fat: lunch.fat,
+      ingredients: lunch.ingredients, instructions: lunch.instructions,
+      baseCalories: lunches[i].baseCalories,
     });
     meals.push({
-      day: DAYS_NL[i],
-      dayIndex: i,
-      type: "dinner",
-      name: dinner.name,
-      description: dinner.description,
-      calories: dinner.calories,
-      protein: dinner.protein,
-      carbs: dinner.carbs,
-      fat: dinner.fat,
-      ingredients: dinner.ingredients,
-      instructions: dinner.instructions,
+      day: DAYS_NL[i], dayIndex: i, type: "dinner",
+      name: dinner.name, description: dinner.description,
+      calories: dinner.calories, protein: dinner.protein,
+      carbs: dinner.carbs, fat: dinner.fat,
+      ingredients: dinner.ingredients, instructions: dinner.instructions,
+      baseCalories: dinners[i].baseCalories,
     });
   }
 

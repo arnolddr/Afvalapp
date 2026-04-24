@@ -19,6 +19,7 @@ export interface MealData {
   ingredients: string[];
   instructions: string[];
   allCalories?: Record<string, number>;
+  baseCalories?: number;
 }
 
 export interface MealPlan {

@@ -27,7 +27,11 @@ export default function RecipeModal({ meal, onClose, defaultServings = 2 }: Prop
 
   if (!meal) return null;
 
-  const scaledIngredients = scaleIngredients(meal.ingredients, servings);
+  // Scale ingredients by calorie factor (how much larger this portion is vs base recipe)
+  // then multiply by number of servings.
+  const calorieScaleFactor =
+    meal.baseCalories && meal.baseCalories > 0 ? meal.calories / meal.baseCalories : 1;
+  const scaledIngredients = scaleIngredients(meal.ingredients, servings * calorieScaleFactor);
 
   return (
     <div

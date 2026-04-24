@@ -34,25 +34,19 @@ export async function POST(req: NextRequest) {
 
   const insertMeal = db.prepare(
     `INSERT INTO Meal (mealPlanId, day, dayIndex, type, name, description,
-      calories, protein, carbs, fat, ingredients, instructions)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      calories, protein, carbs, fat, ingredients, instructions, baseCalories)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
   const insertMany = db.transaction(() => {
     for (const meal of meals) {
       insertMeal.run(
-        plan.id,
-        meal.day,
-        meal.dayIndex,
-        meal.type,
-        meal.name,
-        meal.description,
-        meal.calories,
-        meal.protein,
-        meal.carbs,
-        meal.fat,
+        plan.id, meal.day, meal.dayIndex, meal.type,
+        meal.name, meal.description, meal.calories,
+        meal.protein, meal.carbs, meal.fat,
         JSON.stringify(meal.ingredients),
-        JSON.stringify(meal.instructions)
+        JSON.stringify(meal.instructions),
+        meal.baseCalories
       );
     }
   });
