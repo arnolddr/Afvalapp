@@ -1,12 +1,14 @@
-FROM node:22-alpine
+FROM node:22-slim
 
 # Build tools needed to compile better-sqlite3 from source
-RUN apk add --no-cache python3 make g++
+RUN apt-get update && apt-get install -y python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+# npm install (not ci) so platform-specific optional deps install correctly on ARM
+RUN npm install
 
 COPY . .
 RUN npm run build
