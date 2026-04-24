@@ -8,6 +8,7 @@ interface ProfileData {
   height: number;
   age: number;
   gender: string;
+  goalWeight: number | null;
 }
 
 interface Props {
@@ -26,6 +27,7 @@ export default function ProfileSelector({ activeProfile, onChange, onSnackChange
   const [localHeight, setLocalHeight] = useState("");
   const [localAge, setLocalAge] = useState("");
   const [localGender, setLocalGender] = useState<"man" | "vrouw">("man");
+  const [localGoal, setLocalGoal] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -45,6 +47,7 @@ export default function ProfileSelector({ activeProfile, onChange, onSnackChange
       setLocalHeight(String(p.height ?? 170));
       setLocalAge(String(p.age ?? 35));
       setLocalGender((p.gender as "man" | "vrouw") ?? "man");
+      setLocalGoal(p.goalWeight != null ? String(p.goalWeight) : "");
     }
   }, [activeProfile, profiles]);
 
@@ -64,15 +67,29 @@ export default function ProfileSelector({ activeProfile, onChange, onSnackChange
     const a = parseInt(localAge, 10);
     if (isNaN(h) || h < 100 || h > 250) return;
     if (isNaN(a) || a < 10 || a > 120) return;
+    const goalNum = localGoal.trim() === "" ? null : parseFloat(localGoal.replace(",", "."));
+    if (goalNum !== null && (isNaN(goalNum) || goalNum < 30 || goalNum > 300)) return;
     setSaving(true);
     await fetch("/api/profiles", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: activeProfile, height: h, age: a, gender: localGender }),
+      body: JSON.stringify({
+        name: activeProfile,
+        height: h,
+        age: a,
+        gender: localGender,
+        goalWeight: goalNum,
+      }),
     });
     setProfiles((prev) => ({
       ...prev,
-      [activeProfile]: { ...prev[activeProfile], height: h, age: a, gender: localGender },
+      [activeProfile]: {
+        ...prev[activeProfile],
+        height: h,
+        age: a,
+        gender: localGender,
+        goalWeight: goalNum,
+      },
     }));
     setSaving(false);
     setBodyOpen(false);
@@ -128,10 +145,11 @@ export default function ProfileSelector({ activeProfile, onChange, onSnackChange
               className="w-full flex items-center justify-between px-1 text-sm text-gray-600 hover:text-gray-900"
             >
               <span className="font-medium">
-                Lichaamsgegevens
+                Lichaamsgegevens & doel
                 {activeData && (
                   <span className="ml-1.5 font-normal text-gray-400">
                     {activeData.height} cm · {activeData.age} jr · {activeData.gender}
+                    {activeData.goalWeight != null && ` · doel ${activeData.goalWeight} kg`}
                   </span>
                 )}
               </span>
@@ -174,6 +192,21 @@ export default function ProfileSelector({ activeProfile, onChange, onSnackChange
                       <option value="vrouw">Vrouw</option>
                     </select>
                   </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">
+                    Doelgewicht (kg) <span className="text-gray-400">— optioneel</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="30"
+                    max="300"
+                    value={localGoal}
+                    onChange={(e) => setLocalGoal(e.target.value)}
+                    placeholder="Bijv. 75"
+                    className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
                 </div>
                 <button
                   onClick={saveBodyData}

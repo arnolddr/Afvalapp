@@ -8,11 +8,12 @@ interface ProfileRow {
   height: number;
   age: number;
   gender: string;
+  goalWeight: number | null;
 }
 
 export async function GET() {
   const profiles = db
-    .prepare("SELECT id, name, eatsSnacks, height, age, gender FROM Profile ORDER BY id ASC")
+    .prepare("SELECT id, name, eatsSnacks, height, age, gender, goalWeight FROM Profile ORDER BY id ASC")
     .all() as ProfileRow[];
   return NextResponse.json(
     profiles.map((p) => ({ ...p, eatsSnacks: p.eatsSnacks === 1 }))
@@ -44,6 +45,12 @@ export async function PATCH(req: NextRequest) {
   if (body.gender === "man" || body.gender === "vrouw") {
     setClauses.push("gender = ?");
     values.push(body.gender);
+  }
+  if (body.goalWeight === null) {
+    setClauses.push("goalWeight = NULL");
+  } else if (typeof body.goalWeight === "number" && body.goalWeight >= 30 && body.goalWeight <= 300) {
+    setClauses.push("goalWeight = ?");
+    values.push(body.goalWeight);
   }
 
   if (setClauses.length === 0) {

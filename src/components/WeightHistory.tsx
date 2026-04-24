@@ -6,10 +6,67 @@ import { WeightEntry } from "@/types";
 interface Props {
   entries: WeightEntry[];
   profile: string;
+  goalWeight: number | null;
   onDelete: (id: number) => void;
 }
 
-export default function WeightHistory({ entries, profile, onDelete }: Props) {
+function WeightChart({ entries, goalWeight }: { entries: WeightEntry[]; goalWeight: number | null }) {
+  if (entries.length < 2) return null;
+
+  // Chronological order (oldest to newest)
+  const points = [...entries].reverse();
+  const weights = points.map((e) => e.weight);
+  const min = Math.min(...weights, goalWeight ?? Infinity);
+  const max = Math.max(...weights, goalWeight ?? -Infinity);
+  const pad = Math.max((max - min) * 0.1, 0.5);
+  const yMin = min - pad;
+  const yMax = max + pad;
+  const range = yMax - yMin || 1;
+
+  const width = 300;
+  const height = 80;
+  const xStep = points.length > 1 ? width / (points.length - 1) : width;
+
+  const coords = points.map((p, i) => ({
+    x: i * xStep,
+    y: height - ((p.weight - yMin) / range) * height,
+  }));
+
+  const path = coords.map((c, i) => `${i === 0 ? "M" : "L"} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(" ");
+  const goalY = goalWeight != null ? height - ((goalWeight - yMin) / range) * height : null;
+
+  const trend = points[points.length - 1].weight - points[0].weight;
+  const trendColor = trend < 0 ? "stroke-green-500" : trend > 0 ? "stroke-red-400" : "stroke-gray-400";
+
+  return (
+    <div className="mb-3">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-20" preserveAspectRatio="none">
+        {goalY != null && (
+          <line
+            x1="0"
+            x2={width}
+            y1={goalY}
+            y2={goalY}
+            strokeDasharray="4,4"
+            className="stroke-green-400"
+            strokeWidth="1"
+          />
+        )}
+        <path d={path} fill="none" className={trendColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        {coords.map((c, i) => (
+          <circle key={i} cx={c.x} cy={c.y} r="2.5" className={`fill-white ${trendColor.replace("stroke", "stroke")}`} strokeWidth="1.5" />
+        ))}
+      </svg>
+      <div className="flex justify-between text-xs text-gray-400 mt-1">
+        <span>{new Date(points[0].date).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}</span>
+        {goalWeight != null && <span className="text-green-600">- - doel {goalWeight} kg</span>}
+        <span>{new Date(points[points.length - 1].date).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}</span>
+      </div>
+    </div>
+  );
+}
+
+export default function WeightHistory({ entries, profile, goalWeight, onDelete }: Props) {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   async function handleDelete(id: number) {
@@ -63,6 +120,8 @@ export default function WeightHistory({ entries, profile, onDelete }: Props) {
           </div>
         )}
       </div>
+
+      <WeightChart entries={entries} goalWeight={goalWeight} />
 
       <div className="space-y-2 max-h-40 overflow-y-auto">
         {entries.map((entry, idx) => (

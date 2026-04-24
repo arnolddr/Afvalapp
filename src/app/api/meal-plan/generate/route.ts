@@ -22,13 +22,8 @@ export async function POST(req: NextRequest) {
 
   const weekStartISO = weekStart.toISOString();
 
-  // Replace any existing plan for this same week (1 plan per week)
-  const existing = db
-    .prepare("SELECT id FROM MealPlan WHERE weekStart = ?")
-    .get(weekStartISO) as { id: number } | undefined;
-  if (existing) {
-    db.prepare("DELETE FROM MealPlan WHERE id = ?").run(existing.id);
-  }
+  // Replace any existing plan(s) for this same week (1 plan per week)
+  db.prepare("DELETE FROM MealPlan WHERE weekStart = ?").run(weekStartISO);
 
   const plan = db
     .prepare(

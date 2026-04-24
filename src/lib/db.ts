@@ -96,5 +96,25 @@ try {
 } catch {
   // column already exists
 }
+try {
+  db.exec("ALTER TABLE Profile ADD COLUMN goalWeight REAL");
+} catch {
+  // column already exists
+}
+
+// One-time cleanup: keep only the most recent plan per week, then prune to 2 weeks total
+db.exec(`
+  DELETE FROM MealPlan WHERE id NOT IN (
+    SELECT MAX(id) FROM MealPlan GROUP BY weekStart
+  )
+`);
+const remaining = db
+  .prepare("SELECT id FROM MealPlan ORDER BY generatedAt DESC")
+  .all() as { id: number }[];
+if (remaining.length > 2) {
+  const toDelete = remaining.slice(2).map((p) => p.id);
+  const placeholders = toDelete.map(() => "?").join(",");
+  db.prepare(`DELETE FROM MealPlan WHERE id IN (${placeholders})`).run(...toDelete);
+}
 
 export default db;

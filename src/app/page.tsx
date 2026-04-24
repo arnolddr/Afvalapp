@@ -11,6 +11,7 @@ import Navigation, { Tab } from "@/components/Navigation";
 import ProfileSelector from "@/components/ProfileSelector";
 import DailySnacks from "@/components/DailySnacks";
 import InstallBanner from "@/components/InstallBanner";
+import ProgressPanel from "@/components/ProgressPanel";
 import { MealPlan, WeightEntry } from "@/types";
 import { calculateWeightLossCalories } from "@/lib/calories";
 
@@ -20,6 +21,7 @@ interface ProfileData {
   height: number;
   age: number;
   gender: string;
+  goalWeight: number | null;
 }
 
 export default function Home() {
@@ -131,24 +133,21 @@ export default function Home() {
             />
 
             {latestWeight && tdee && (
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label: "Gewicht", value: `${latestWeight.toFixed(1)} kg`, sub: "Laatste meting" },
-                  { label: "Dagdoel", value: `${tdee} kcal`, sub: "Voor afvallen" },
-                  { label: "Verwacht", value: "~0.5 kg", sub: "Verlies/week" },
-                ].map(({ label, value, sub }) => (
-                  <div key={label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3">
-                    <p className="text-xs text-gray-500">{label}</p>
-                    <p className="text-lg font-bold text-gray-900 mt-0.5">{value}</p>
-                    <p className="text-xs text-gray-400">{sub}</p>
-                  </div>
-                ))}
-              </div>
+              <ProgressPanel
+                entries={weights}
+                goalWeight={activeProfileData?.goalWeight ?? null}
+                tdee={tdee}
+              />
             )}
 
             <div className="grid gap-4 md:grid-cols-2">
               <WeightInput profile={profile} onWeightSaved={handleWeightSaved} />
-              <WeightHistory entries={weights} profile={profile} onDelete={handleWeightDeleted} />
+              <WeightHistory
+                entries={weights}
+                profile={profile}
+                goalWeight={activeProfileData?.goalWeight ?? null}
+                onDelete={handleWeightDeleted}
+              />
             </div>
 
             <GeneratePlanButton
