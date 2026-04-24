@@ -20,6 +20,7 @@ db.exec(`
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     weight    REAL    NOT NULL,
     unit      TEXT    NOT NULL DEFAULT 'kg',
+    profile   TEXT    NOT NULL DEFAULT 'Ik',
     date      TEXT    NOT NULL DEFAULT (datetime('now')),
     createdAt TEXT    NOT NULL DEFAULT (datetime('now'))
   );
@@ -49,6 +50,25 @@ db.exec(`
     instructions TEXT    NOT NULL,
     FOREIGN KEY (mealPlanId) REFERENCES MealPlan(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS Profile (
+    id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT    NOT NULL UNIQUE
+  );
 `);
+
+// Ensure at least two default profiles exist
+const existingProfiles = db.prepare("SELECT COUNT(*) as count FROM Profile").get() as { count: number };
+if (existingProfiles.count === 0) {
+  db.prepare("INSERT INTO Profile (name) VALUES (?)").run("Ik");
+  db.prepare("INSERT INTO Profile (name) VALUES (?)").run("Vriendin");
+}
+
+// Safe migration: add profile column if missing (existing installs)
+try {
+  db.exec("ALTER TABLE WeightEntry ADD COLUMN profile TEXT NOT NULL DEFAULT 'Ik'");
+} catch {
+  // column already exists
+}
 
 export default db;

@@ -4,14 +4,15 @@ import { WeightEntry } from "@/types";
 
 interface Props {
   entries: WeightEntry[];
+  profile: string;
 }
 
-export default function WeightHistory({ entries }: Props) {
+export default function WeightHistory({ entries, profile }: Props) {
   if (entries.length === 0) {
     return (
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-2">
-          Gewichtsverloop
+          Gewichtsverloop {profile !== "Ik" ? `· ${profile}` : ""}
         </h2>
         <p className="text-gray-500 text-sm">
           Nog geen gewichten ingevoerd.

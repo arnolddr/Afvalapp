@@ -3,10 +3,11 @@
 import { useState } from "react";
 
 interface Props {
+  profile: string;
   onWeightSaved: (weight: number) => void;
 }
 
-export default function WeightInput({ onWeightSaved }: Props) {
+export default function WeightInput({ profile, onWeightSaved }: Props) {
   const [weight, setWeight] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -25,7 +26,7 @@ export default function WeightInput({ onWeightSaved }: Props) {
       const res = await fetch("/api/weight", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ weight: w }),
+        body: JSON.stringify({ weight: w, profile }),
       });
       if (!res.ok) throw new Error("Opslaan mislukt");
       setSuccess(true);

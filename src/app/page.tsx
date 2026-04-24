@@ -5,34 +5,37 @@ import WeightInput from "@/components/WeightInput";
 import WeightHistory from "@/components/WeightHistory";
 import GeneratePlanButton from "@/components/GeneratePlanButton";
 import MealPlanWeek from "@/components/MealPlanWeek";
+import RecipesView from "@/components/RecipesView";
+import ShoppingList from "@/components/ShoppingList";
+import Navigation, { Tab } from "@/components/Navigation";
+import ProfileSelector from "@/components/ProfileSelector";
+import InstallBanner from "@/components/InstallBanner";
 import { MealPlan, WeightEntry } from "@/types";
 import { calculateWeightLossCalories } from "@/lib/calories";
-import InstallBanner from "@/components/InstallBanner";
 
 export default function Home() {
+  const [tab, setTab] = useState<Tab>("dashboard");
+  const [profile, setProfile] = useState("Ik");
   const [weights, setWeights] = useState<WeightEntry[]>([]);
   const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
   const [selectedPlanIdx, setSelectedPlanIdx] = useState(0);
   const [loadingData, setLoadingData] = useState(true);
 
   const latestWeight = weights[0]?.weight ?? null;
+  const isThursday = new Date().getDay() === 4;
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const [wRes, mpRes] = await Promise.all([
-          fetch("/api/weight"),
-          fetch("/api/meal-plan"),
-        ]);
-        const [w, mp] = await Promise.all([wRes.json(), mpRes.json()]);
+    setLoadingData(true);
+    Promise.all([
+      fetch(`/api/weight?profile=${encodeURIComponent(profile)}`).then((r) => r.json()),
+      fetch("/api/meal-plan").then((r) => r.json()),
+    ])
+      .then(([w, mp]) => {
         setWeights(w);
         setMealPlans(mp);
-      } finally {
-        setLoadingData(false);
-      }
-    }
-    loadData();
-  }, []);
+      })
+      .finally(() => setLoadingData(false));
+  }, [profile]);
 
   function handleWeightSaved(weight: number) {
     const newEntry: WeightEntry = {
@@ -52,119 +55,108 @@ export default function Home() {
   const currentPlan = mealPlans[selectedPlanIdx];
   const tdee = latestWeight ? calculateWeightLossCalories(latestWeight) : null;
 
-  const isThursday = new Date().getDay() === 4;
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-green-600 rounded-xl flex items-center justify-center text-white text-lg">
+        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-green-600 rounded-xl flex items-center justify-center text-white">
               🥦
             </div>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900">AfvalApp</h1>
-              <p className="text-xs text-gray-500">Persoonlijk weekmenu</p>
-            </div>
+            <h1 className="text-base font-bold text-gray-900">AfvalApp</h1>
           </div>
-          {isThursday && (
-            <span className="text-xs font-medium bg-green-100 text-green-700 px-3 py-1 rounded-full">
-              Vandaag is het donderdag – tijd voor een nieuw menu!
+          {isThursday && tab === "dashboard" && (
+            <span className="text-xs font-medium bg-green-100 text-green-700 px-2.5 py-1 rounded-full">
+              Donderdag — nieuw menu!
             </span>
           )}
         </div>
+        <Navigation active={tab} onChange={setTab} />
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-6 space-y-5">
-        {/* Stats bar */}
-        {latestWeight && tdee && (
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              {
-                label: "Huidig gewicht",
-                value: `${latestWeight.toFixed(1)} kg`,
-                sub: "Laatste meting",
-              },
-              {
-                label: "Dagdoel",
-                value: `${tdee} kcal`,
-                sub: "Calorieën voor verlies",
-              },
-              {
-                label: "Verwacht verlies",
-                value: "~0.5 kg",
-                sub: "Per week",
-              },
-            ].map(({ label, value, sub }) => (
-              <div
-                key={label}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4"
-              >
-                <p className="text-xs text-gray-500">{label}</p>
-                <p className="text-xl font-bold text-gray-900 mt-0.5">{value}</p>
-                <p className="text-xs text-gray-400">{sub}</p>
-              </div>
-            ))}
-          </div>
-        )}
+      <main className="max-w-3xl mx-auto px-4 py-5 space-y-4">
+        {/* Dashboard */}
+        {tab === "dashboard" && (
+          <>
+            <ProfileSelector activeProfile={profile} onChange={setProfile} />
 
-        {/* Weight section */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <WeightInput onWeightSaved={handleWeightSaved} />
-          <WeightHistory entries={weights} />
-        </div>
-
-        {/* Generate plan */}
-        <GeneratePlanButton
-          latestWeight={latestWeight}
-          onPlanGenerated={handlePlanGenerated}
-        />
-
-        {/* Meal plan display */}
-        {loadingData ? (
-          <div className="text-center py-12 text-gray-400">Laden...</div>
-        ) : mealPlans.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
-            <p className="text-4xl mb-3">🍽️</p>
-            <p className="text-gray-600 font-medium">Nog geen weekmenu</p>
-            <p className="text-gray-400 text-sm mt-1">
-              Voer je gewicht in en klik op &ldquo;Weekmenu genereren&rdquo; om
-              je eerste menu aan te maken.
-            </p>
-          </div>
-        ) : (
-          <div>
-            {/* Plan selector when multiple exist */}
-            {mealPlans.length > 1 && (
-              <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-                {mealPlans.map((plan, idx) => (
-                  <button
-                    key={plan.id}
-                    onClick={() => setSelectedPlanIdx(idx)}
-                    className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                      idx === selectedPlanIdx
-                        ? "bg-green-600 text-white"
-                        : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
-                    }`}
-                  >
-                    {new Date(plan.weekStart).toLocaleDateString("nl-NL", {
-                      day: "numeric",
-                      month: "short",
-                    })}
-                    {" – "}
-                    {new Date(plan.weekEnd).toLocaleDateString("nl-NL", {
-                      day: "numeric",
-                      month: "short",
-                    })}
-                  </button>
+            {latestWeight && tdee && (
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: "Gewicht", value: `${latestWeight.toFixed(1)} kg`, sub: "Laatste meting" },
+                  { label: "Dagdoel", value: `${tdee} kcal`, sub: "Voor afvallen" },
+                  { label: "Verwacht", value: "~0.5 kg", sub: "Verlies/week" },
+                ].map(({ label, value, sub }) => (
+                  <div key={label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3">
+                    <p className="text-xs text-gray-500">{label}</p>
+                    <p className="text-lg font-bold text-gray-900 mt-0.5">{value}</p>
+                    <p className="text-xs text-gray-400">{sub}</p>
+                  </div>
                 ))}
               </div>
             )}
-            {currentPlan && <MealPlanWeek plan={currentPlan} />}
-          </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <WeightInput profile={profile} onWeightSaved={handleWeightSaved} />
+              <WeightHistory entries={weights} profile={profile} />
+            </div>
+
+            <GeneratePlanButton
+              latestWeight={latestWeight}
+              onPlanGenerated={handlePlanGenerated}
+            />
+
+            {loadingData ? (
+              <div className="text-center py-12 text-gray-400">Laden...</div>
+            ) : mealPlans.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+                <p className="text-4xl mb-3">🍽️</p>
+                <p className="text-gray-600 font-medium">Nog geen weekmenu</p>
+                <p className="text-gray-400 text-sm mt-1">
+                  Voer je gewicht in en klik op &ldquo;Weekmenu genereren&rdquo; om
+                  je eerste menu aan te maken.
+                </p>
+              </div>
+            ) : (
+              <div>
+                {mealPlans.length > 1 && (
+                  <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+                    {mealPlans.map((plan, idx) => (
+                      <button
+                        key={plan.id}
+                        onClick={() => setSelectedPlanIdx(idx)}
+                        className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                          idx === selectedPlanIdx
+                            ? "bg-green-600 text-white"
+                            : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        {new Date(plan.weekStart).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}
+                        {" – "}
+                        {new Date(plan.weekEnd).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {currentPlan && <MealPlanWeek plan={currentPlan} />}
+              </div>
+            )}
+          </>
         )}
+
+        {/* Recepten */}
+        {tab === "recepten" && (
+          <>
+            <h2 className="text-lg font-semibold text-gray-900">Alle recepten</h2>
+            <RecipesView />
+          </>
+        )}
+
+        {/* Boodschappen */}
+        {tab === "boodschappen" && <ShoppingList />}
       </main>
+
       <InstallBanner />
     </div>
   );
