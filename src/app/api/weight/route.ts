@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import db from "@/lib/db";
 
 export async function GET() {
-  const entries = await prisma.weightEntry.findMany({
-    orderBy: { date: "desc" },
-    take: 20,
-  });
+  const entries = db
+    .prepare(
+      "SELECT * FROM WeightEntry ORDER BY date DESC, id DESC LIMIT 20"
+    )
+    .all();
   return NextResponse.json(entries);
 }
 
@@ -16,9 +17,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ongeldig gewicht" }, { status: 400 });
   }
 
-  const entry = await prisma.weightEntry.create({
-    data: { weight, unit: "kg" },
-  });
+  const result = db
+    .prepare("INSERT INTO WeightEntry (weight) VALUES (?) RETURNING *")
+    .get(weight);
 
-  return NextResponse.json(entry, { status: 201 });
+  return NextResponse.json(result, { status: 201 });
 }

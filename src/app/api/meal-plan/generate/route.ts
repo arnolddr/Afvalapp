@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import db from "@/lib/db";
 import { generateMealPlan } from "@/lib/mealPlanGenerator";
 
 export async function POST(req: NextRequest) {
@@ -12,42 +12,56 @@ export async function POST(req: NextRequest) {
   const { weekStart, weekEnd, targetCalories, meals } =
     await generateMealPlan(weight);
 
-  const mealPlan = await prisma.mealPlan.create({
-    data: {
-      weekStart,
-      weekEnd,
+  const plan = db
+    .prepare(
+      `INSERT INTO MealPlan (weekStart, weekEnd, weight, targetCalories)
+       VALUES (?, ?, ?, ?) RETURNING *`
+    )
+    .get(
+      weekStart.toISOString(),
+      weekEnd.toISOString(),
       weight,
-      targetCalories,
-      meals: {
-        create: meals.map((meal) => ({
-          day: meal.day,
-          dayIndex: meal.dayIndex,
-          type: meal.type,
-          name: meal.name,
-          description: meal.description,
-          calories: meal.calories,
-          protein: meal.protein,
-          carbs: meal.carbs,
-          fat: meal.fat,
-          ingredients: JSON.stringify(meal.ingredients),
-          instructions: JSON.stringify(meal.instructions),
-        })),
-      },
-    },
-    include: {
-      meals: { orderBy: [{ dayIndex: "asc" }, { type: "asc" }] },
-    },
+      targetCalories
+    ) as Record<string, unknown>;
+
+  const insertMeal = db.prepare(
+    `INSERT INTO Meal (mealPlanId, day, dayIndex, type, name, description,
+      calories, protein, carbs, fat, ingredients, instructions)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+
+  const insertMany = db.transaction(() => {
+    for (const meal of meals) {
+      insertMeal.run(
+        plan.id,
+        meal.day,
+        meal.dayIndex,
+        meal.type,
+        meal.name,
+        meal.description,
+        meal.calories,
+        meal.protein,
+        meal.carbs,
+        meal.fat,
+        JSON.stringify(meal.ingredients),
+        JSON.stringify(meal.instructions)
+      );
+    }
   });
+  insertMany();
+
+  const savedMeals = db
+    .prepare(
+      "SELECT * FROM Meal WHERE mealPlanId = ? ORDER BY dayIndex ASC, type ASC"
+    )
+    .all(plan.id as number) as Record<string, unknown>[];
 
   return NextResponse.json({
-    ...mealPlan,
-    weekStart: mealPlan.weekStart.toISOString(),
-    weekEnd: mealPlan.weekEnd.toISOString(),
-    generatedAt: mealPlan.generatedAt.toISOString(),
-    meals: mealPlan.meals.map((meal) => ({
+    ...plan,
+    meals: savedMeals.map((meal) => ({
       ...meal,
-      ingredients: JSON.parse(meal.ingredients),
-      instructions: JSON.parse(meal.instructions),
+      ingredients: JSON.parse(meal.ingredients as string),
+      instructions: JSON.parse(meal.instructions as string),
     })),
   });
 }
