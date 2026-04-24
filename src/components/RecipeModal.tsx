@@ -10,8 +10,11 @@ interface Props {
   defaultServings?: number;
 }
 
+type Tab = "samen" | string;
+
 export default function RecipeModal({ meal, onClose, defaultServings = 2 }: Props) {
   const [servings, setServings] = useState(defaultServings);
+  const [tab, setTab] = useState<Tab>("samen");
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -23,15 +26,50 @@ export default function RecipeModal({ meal, onClose, defaultServings = 2 }: Prop
 
   useEffect(() => {
     setServings(defaultServings);
+    setTab("samen");
   }, [defaultServings, meal?.id]);
 
   if (!meal) return null;
 
-  // Scale ingredients by calorie factor (how much larger this portion is vs base recipe)
-  // then multiply by number of servings.
-  const calorieScaleFactor =
-    meal.baseCalories && meal.baseCalories > 0 ? meal.calories / meal.baseCalories : 1;
-  const scaledIngredients = scaleIngredients(meal.ingredients, servings * calorieScaleFactor);
+  const baseCalories = meal.baseCalories && meal.baseCalories > 0 ? meal.baseCalories : null;
+  const profileEntries = meal.allCalories ? Object.entries(meal.allCalories) : [];
+  const hasPerProfile = baseCalories !== null && profileEntries.length >= 1;
+
+  // Per-profile ingredient lists
+  const perProfile = hasPerProfile
+    ? profileEntries.map(([name, kcal]) => ({
+        name,
+        kcal,
+        factor: kcal / baseCalories!,
+        ingredients: scaleIngredients(meal.ingredients, kcal / baseCalories!),
+      }))
+    : [];
+
+  // Combined total for cooking together
+  const combinedFactor = hasPerProfile
+    ? profileEntries.reduce((s, [, kcal]) => s + kcal, 0) / baseCalories!
+    : null;
+  const combinedIngredients = combinedFactor !== null
+    ? scaleIngredients(meal.ingredients, combinedFactor)
+    : null;
+
+  // Fallback: servings slider (no allCalories or no baseCalories)
+  const fallbackFactor = baseCalories
+    ? (meal.calories / baseCalories) * servings
+    : servings;
+  const fallbackIngredients = scaleIngredients(meal.ingredients, fallbackFactor);
+
+  const tabNames: Tab[] = ["samen", ...perProfile.map((p) => p.name)];
+  const activeTabData =
+    tab === "samen"
+      ? null
+      : perProfile.find((p) => p.name === tab) ?? null;
+  const activeIngredients =
+    hasPerProfile
+      ? tab === "samen"
+        ? combinedIngredients!
+        : activeTabData!.ingredients
+      : fallbackIngredients;
 
   return (
     <div
@@ -43,15 +81,14 @@ export default function RecipeModal({ meal, onClose, defaultServings = 2 }: Prop
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6">
+          {/* Header */}
           <div className="flex justify-between items-start mb-4">
             <div>
               <span className="text-xs font-medium uppercase tracking-wide text-green-600 bg-green-50 px-2 py-1 rounded-full">
                 {meal.type === "lunch" ? "Lunch" : "Diner"}
                 {meal.day ? ` · ${meal.day}` : ""}
               </span>
-              <h2 className="text-xl font-bold text-gray-900 mt-2">
-                {meal.name}
-              </h2>
+              <h2 className="text-xl font-bold text-gray-900 mt-2">{meal.name}</h2>
               <p className="text-gray-600 text-sm mt-1">{meal.description}</p>
             </div>
             <button
@@ -62,6 +99,7 @@ export default function RecipeModal({ meal, onClose, defaultServings = 2 }: Prop
             </button>
           </div>
 
+          {/* Macro grid */}
           <div className="grid grid-cols-4 gap-2 mb-5">
             {[
               { label: "Kcal p.p.", value: `${meal.calories}`, color: "bg-orange-50 text-orange-700" },
@@ -76,41 +114,101 @@ export default function RecipeModal({ meal, onClose, defaultServings = 2 }: Prop
             ))}
           </div>
 
-          <div className="flex items-center justify-between mb-3 bg-gray-50 rounded-xl p-3">
-            <div>
-              <p className="text-xs text-gray-500">Ingrediënten voor</p>
-              <p className="text-sm font-semibold text-gray-900">
-                {servings} {servings === 1 ? "persoon" : "personen"}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setServings(Math.max(1, servings - 1))}
-                className="w-8 h-8 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
-              >
-                −
-              </button>
-              <span className="w-6 text-center font-semibold">{servings}</span>
-              <button
-                onClick={() => setServings(Math.min(8, servings + 1))}
-                className="w-8 h-8 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
-              >
-                +
-              </button>
-            </div>
-          </div>
+          {/* Ingredient section */}
+          {hasPerProfile ? (
+            <div className="mb-5">
+              {/* Tab bar */}
+              <div className="flex gap-1 mb-3 bg-gray-100 rounded-xl p-1">
+                {tabNames.map((t) => {
+                  const label =
+                    t === "samen"
+                      ? `Samen (${perProfile.length} pers.)`
+                      : (() => {
+                          const p = perProfile.find((x) => x.name === t)!;
+                          return `${t} (${p.kcal} kcal)`;
+                        })();
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => setTab(t)}
+                      className={`flex-1 text-xs font-medium py-1.5 px-2 rounded-lg transition-colors ${
+                        tab === t
+                          ? "bg-white text-gray-900 shadow-sm"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
 
-          <div className="mb-5">
-            <ul className="space-y-1">
-              {scaledIngredients.map((ing, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                  <span className="text-green-500 mt-0.5">•</span>
-                  {ing}
-                </li>
-              ))}
-            </ul>
-          </div>
+              {/* Ingredient list */}
+              <ul className="space-y-1">
+                {activeIngredients.map((ing, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                    <span className="text-green-500 mt-0.5">•</span>
+                    {ing}
+                  </li>
+                ))}
+              </ul>
 
+              {/* Per-person summary when on "samen" tab */}
+              {tab === "samen" && perProfile.length > 1 && (
+                <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2">
+                  {perProfile.map((p) => (
+                    <button
+                      key={p.name}
+                      onClick={() => setTab(p.name)}
+                      className="text-left bg-gray-50 rounded-xl p-2.5 hover:bg-gray-100 transition-colors"
+                    >
+                      <p className="text-xs font-medium text-gray-700">{p.name}</p>
+                      <p className="text-xs text-gray-500">{p.kcal} kcal — tik voor portie</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Fallback: servings slider */
+            <>
+              <div className="flex items-center justify-between mb-3 bg-gray-50 rounded-xl p-3">
+                <div>
+                  <p className="text-xs text-gray-500">Ingrediënten voor</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {servings} {servings === 1 ? "persoon" : "personen"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setServings(Math.max(1, servings - 1))}
+                    className="w-8 h-8 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
+                  >
+                    −
+                  </button>
+                  <span className="w-6 text-center font-semibold">{servings}</span>
+                  <button
+                    onClick={() => setServings(Math.min(8, servings + 1))}
+                    className="w-8 h-8 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <div className="mb-5">
+                <ul className="space-y-1">
+                  {fallbackIngredients.map((ing, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                      <span className="text-green-500 mt-0.5">•</span>
+                      {ing}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </>
+          )}
+
+          {/* Instructions */}
           <div>
             <h3 className="font-semibold text-gray-900 mb-2">Bereidingswijze</h3>
             <ol className="space-y-2">
