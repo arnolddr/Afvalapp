@@ -20,17 +20,22 @@ export async function POST(req: NextRequest) {
     (profileRow?.gender ?? "man") as "man" | "vrouw"
   );
 
+  const weekStartISO = weekStart.toISOString();
+
+  // Replace any existing plan for this same week (1 plan per week)
+  const existing = db
+    .prepare("SELECT id FROM MealPlan WHERE weekStart = ?")
+    .get(weekStartISO) as { id: number } | undefined;
+  if (existing) {
+    db.prepare("DELETE FROM MealPlan WHERE id = ?").run(existing.id);
+  }
+
   const plan = db
     .prepare(
-      `INSERT INTO MealPlan (weekStart, weekEnd, weight, targetCalories)
-       VALUES (?, ?, ?, ?) RETURNING *`
+      `INSERT INTO MealPlan (weekStart, weekEnd, weight, targetCalories, profile)
+       VALUES (?, ?, ?, ?, ?) RETURNING *`
     )
-    .get(
-      weekStart.toISOString(),
-      weekEnd.toISOString(),
-      weight,
-      targetCalories
-    ) as Record<string, unknown>;
+    .get(weekStartISO, weekEnd.toISOString(), weight, targetCalories, profile) as Record<string, unknown>;
 
   const insertMeal = db.prepare(
     `INSERT INTO Meal (mealPlanId, day, dayIndex, type, name, description,
@@ -58,10 +63,18 @@ export async function POST(req: NextRequest) {
   });
   insertMany();
 
+  // Keep only the 2 most recent weekly plans — delete any older ones
+  const allPlans = db
+    .prepare("SELECT id FROM MealPlan ORDER BY generatedAt DESC")
+    .all() as { id: number }[];
+  if (allPlans.length > 2) {
+    for (const old of allPlans.slice(2)) {
+      db.prepare("DELETE FROM MealPlan WHERE id = ?").run(old.id);
+    }
+  }
+
   const savedMeals = db
-    .prepare(
-      "SELECT * FROM Meal WHERE mealPlanId = ? ORDER BY dayIndex ASC, type ASC"
-    )
+    .prepare("SELECT * FROM Meal WHERE mealPlanId = ? ORDER BY dayIndex ASC, type ASC")
     .all(plan.id as number) as Record<string, unknown>[];
 
   return NextResponse.json({

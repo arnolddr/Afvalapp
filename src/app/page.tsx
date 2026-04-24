@@ -61,16 +61,17 @@ export default function Home() {
 
   useEffect(() => {
     setLoadingData(true);
-    Promise.all([
-      fetch(`/api/weight?profile=${encodeURIComponent(profile)}`).then((r) => r.json()),
-      fetch("/api/meal-plan").then((r) => r.json()),
-    ])
-      .then(([w, mp]) => {
-        setWeights(w);
-        setMealPlans(mp);
-      })
+    fetch(`/api/weight?profile=${encodeURIComponent(profile)}`)
+      .then((r) => r.json())
+      .then(setWeights)
       .finally(() => setLoadingData(false));
   }, [profile]);
+
+  useEffect(() => {
+    fetch(`/api/meal-plan?profile=${encodeURIComponent(profile)}`)
+      .then((r) => r.json())
+      .then(setMealPlans);
+  }, [profile, weights]);
 
   function handleWeightSaved(weight: number) {
     const newEntry: WeightEntry = {
@@ -86,9 +87,14 @@ export default function Home() {
     setWeights((prev) => prev.filter((e) => e.id !== id));
   }
 
-  function handlePlanGenerated(plan: MealPlan) {
-    setMealPlans((prev) => [plan, ...prev]);
-    setSelectedPlanIdx(0);
+  function handlePlanGenerated(_plan: MealPlan) {
+    // Refetch from server so the UI reflects the authoritative max-2 deduplicated list
+    fetch(`/api/meal-plan?profile=${encodeURIComponent(profile)}`)
+      .then((r) => r.json())
+      .then((plans) => {
+        setMealPlans(plans);
+        setSelectedPlanIdx(0);
+      });
   }
 
   const currentPlan = mealPlans[selectedPlanIdx];

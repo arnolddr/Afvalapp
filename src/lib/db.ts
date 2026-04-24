@@ -77,6 +77,11 @@ try {
   // column already exists
 }
 try {
+  db.exec("ALTER TABLE MealPlan ADD COLUMN profile TEXT NOT NULL DEFAULT 'Ik'");
+} catch {
+  // column already exists
+}
+try {
   db.exec("ALTER TABLE Profile ADD COLUMN height INTEGER NOT NULL DEFAULT 170");
 } catch {
   // column already exists
