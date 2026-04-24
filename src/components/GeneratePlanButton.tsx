@@ -97,7 +97,7 @@ export default function GeneratePlanButton({
         className="w-full py-3 bg-white text-green-700 font-semibold rounded-xl hover:bg-green-50 disabled:opacity-60 transition-colors"
       >
         {loading
-          ? "Menu genereren... (kan ~30 sec duren)"
+          ? "Menu samenstellen..."
           : isThursday
           ? "Weekmenu voor komende week genereren"
           : "Nieuw weekmenu aanmaken"}
