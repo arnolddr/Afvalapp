@@ -62,7 +62,7 @@ export async function GET() {
     .prepare("SELECT name, height, age, gender FROM Profile ORDER BY id ASC")
     .all() as ProfileRow[];
 
-  const storedTarget = plan.targetCalories as number;
+  const storedTarget = (plan.targetCalories as number) || 1800;
   let combinedFactor = 0;
   for (const p of profileRows) {
     const latest = db

@@ -72,7 +72,7 @@ export default function RecipeModal({ meal, onClose, defaultServings = 2 }: Prop
     hasPerProfile
       ? tab === "samen"
         ? combinedIngredients!
-        : activeTabData!.ingredients
+        : (activeTabData?.ingredients ?? combinedIngredients!)
       : fallbackIngredients;
 
   return (

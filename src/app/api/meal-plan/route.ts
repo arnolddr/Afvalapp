@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     .all() as Record<string, unknown>[];
 
   const result = plans.map((plan) => {
-    const storedTarget = plan.targetCalories as number;
+    const storedTarget = (plan.targetCalories as number) || 1800;
     const myTarget = allTargets[requestedProfile] ?? storedTarget;
     const myFactor = myTarget / storedTarget;
 

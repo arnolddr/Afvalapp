@@ -8,18 +8,19 @@ interface Props {
   tdee: number;
 }
 
+// Use local calendar date (YYYY-MM-DD) so timezone doesn't shift the day boundary.
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function calcStreak(entries: WeightEntry[]): number {
   if (entries.length === 0) return 0;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const dateSet = new Set(entries.map((e) => localDateStr(new Date(e.date))));
   let streak = 0;
-  let cursor = new Date(today);
-  const dateSet = new Set(
-    entries.map((e) => new Date(e.date).toISOString().slice(0, 10))
-  );
+  const cursor = new Date();
+  cursor.setHours(12, 0, 0, 0); // midday local — safe from DST edge cases
   while (true) {
-    const key = cursor.toISOString().slice(0, 10);
-    if (!dateSet.has(key)) break;
+    if (!dateSet.has(localDateStr(cursor))) break;
     streak++;
     cursor.setDate(cursor.getDate() - 1);
   }
