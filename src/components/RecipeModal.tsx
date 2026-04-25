@@ -3,6 +3,7 @@
 import { MealData } from "@/types";
 import { useEffect, useState } from "react";
 import { scaleIngredients } from "@/lib/ingredients";
+import { RECIPE_BASE_CALORIES } from "@/lib/recipeData";
 
 interface Props {
   meal: MealData | null;
@@ -31,7 +32,10 @@ export default function RecipeModal({ meal, onClose, defaultServings = 2 }: Prop
 
   if (!meal) return null;
 
-  const baseCalories = meal.baseCalories && meal.baseCalories > 0 ? meal.baseCalories : null;
+  const baseCalories =
+    meal.baseCalories && meal.baseCalories > 0
+      ? meal.baseCalories
+      : (RECIPE_BASE_CALORIES[meal.name] ?? null);
   const profileEntries = meal.allCalories ? Object.entries(meal.allCalories) : [];
   const hasPerProfile = baseCalories !== null && profileEntries.length >= 1;
 
