@@ -6,6 +6,10 @@ export default function InstallBanner() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+
     const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
     const isStandalone = window.matchMedia("(display-mode: standalone)").matches;
     const dismissed = sessionStorage.getItem("install-banner-dismissed");

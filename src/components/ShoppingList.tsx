@@ -14,18 +14,42 @@ interface ShoppingData {
   snackProfiles?: string[];
 }
 
+const DATA_KEY = "shopping-list-data";
+const CHECKED_KEY = "shopping-checked";
+
 export default function ShoppingList() {
   const [data, setData] = useState<ShoppingData | null>(null);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
+  const [offline, setOffline] = useState(false);
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
 
   useEffect(() => {
+    // Load check-off state immediately
+    const savedChecked = localStorage.getItem(CHECKED_KEY);
+    if (savedChecked) setChecked(JSON.parse(savedChecked));
+
+    // Load cached list immediately so it shows while fetching
+    const saved = localStorage.getItem(DATA_KEY);
+    if (saved) {
+      const { data: cachedData, at } = JSON.parse(saved);
+      setData(cachedData);
+      setCachedAt(at);
+      setLoading(false);
+    }
+
+    // Try to fetch fresh data from the Pi
     fetch("/api/shopping-list")
       .then((r) => r.json())
-      .then((d) => {
-        setData(d);
-        const saved = localStorage.getItem("shopping-checked");
-        if (saved) setChecked(JSON.parse(saved));
+      .then((fresh: ShoppingData) => {
+        setData(fresh);
+        setOffline(false);
+        const now = new Date().toISOString();
+        setCachedAt(now);
+        localStorage.setItem(DATA_KEY, JSON.stringify({ data: fresh, at: now }));
+      })
+      .catch(() => {
+        setOffline(true);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -33,14 +57,14 @@ export default function ShoppingList() {
   function toggle(key: string) {
     setChecked((prev) => {
       const next = { ...prev, [key]: !prev[key] };
-      localStorage.setItem("shopping-checked", JSON.stringify(next));
+      localStorage.setItem(CHECKED_KEY, JSON.stringify(next));
       return next;
     });
   }
 
   function clearChecked() {
     setChecked({});
-    localStorage.removeItem("shopping-checked");
+    localStorage.removeItem(CHECKED_KEY);
   }
 
   if (loading) {
@@ -64,17 +88,43 @@ export default function ShoppingList() {
 
   return (
     <div>
+      {/* Offline banner */}
+      {offline && (
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 text-sm px-4 py-2.5 rounded-xl mb-4">
+          <span>📵</span>
+          <span>
+            Geen verbinding met thuis — boodschappenlijst uit cache
+            {cachedAt && (
+              <span className="text-amber-500 ml-1">
+                ({new Date(cachedAt).toLocaleDateString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })})
+              </span>
+            )}
+          </span>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">
-            Boodschappenlijst <span className="text-sm font-normal text-gray-500">voor {data.servings ?? 2}</span>
+            Boodschappenlijst{" "}
+            <span className="text-sm font-normal text-gray-500">
+              voor {data.servings ?? 2}
+            </span>
           </h2>
           <p className="text-sm text-gray-500">
-            {new Date(data.plan.weekStart).toLocaleDateString("nl-NL", { day: "numeric", month: "long" })}
+            {new Date(data.plan.weekStart).toLocaleDateString("nl-NL", {
+              day: "numeric",
+              month: "long",
+            })}
             {" – "}
-            {new Date(data.plan.weekEnd).toLocaleDateString("nl-NL", { day: "numeric", month: "long" })}
+            {new Date(data.plan.weekEnd).toLocaleDateString("nl-NL", {
+              day: "numeric",
+              month: "long",
+            })}
             {data.snackProfiles && data.snackProfiles.length > 0 && (
-              <span className="ml-1">· met snacks voor {data.snackProfiles.join(" & ")}</span>
+              <span className="ml-1">
+                · met snacks voor {data.snackProfiles.join(" & ")}
+              </span>
             )}
           </p>
         </div>
@@ -97,7 +147,9 @@ export default function ShoppingList() {
       <div className="h-2 bg-gray-100 rounded-full mb-5 overflow-hidden">
         <div
           className="h-full bg-green-500 rounded-full transition-all duration-300"
-          style={{ width: totalCount > 0 ? `${(checkedCount / totalCount) * 100}%` : "0%" }}
+          style={{
+            width: totalCount > 0 ? `${(checkedCount / totalCount) * 100}%` : "0%",
+          }}
         />
       </div>
 
@@ -105,9 +157,14 @@ export default function ShoppingList() {
         {data.categories.map((cat) => {
           const catChecked = cat.items.filter((item) => checked[item]).length;
           return (
-            <div key={cat.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div
+              key={cat.label}
+              className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+            >
               <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                <h3 className="font-semibold text-gray-800 text-sm">{cat.label}</h3>
+                <h3 className="font-semibold text-gray-800 text-sm">
+                  {cat.label}
+                </h3>
                 <span className="text-xs text-gray-400">
                   {catChecked}/{cat.items.length}
                 </span>
@@ -127,12 +184,28 @@ export default function ShoppingList() {
                         }`}
                       >
                         {checked[item] && (
-                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          <svg
+                            className="w-3 h-3 text-white"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={3}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M5 13l4 4L19 7"
+                            />
                           </svg>
                         )}
                       </div>
-                      <span className={`text-sm ${checked[item] ? "line-through text-gray-400" : "text-gray-700"}`}>
+                      <span
+                        className={`text-sm ${
+                          checked[item]
+                            ? "line-through text-gray-400"
+                            : "text-gray-700"
+                        }`}
+                      >
                         {item}
                       </span>
                     </button>
