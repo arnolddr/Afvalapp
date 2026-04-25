@@ -1,102 +1,181 @@
 "use client";
 
-import { useState } from "react";
-import { MealData } from "@/types";
+import { useState, useEffect } from "react";
+import { MealData, MealPlan } from "@/types";
 import RecipeModal from "./RecipeModal";
 import { LUNCH_RECIPES, DINNER_RECIPES, Recipe } from "@/lib/mealPlanGenerator";
 
-type Filter = "alles" | "lunch" | "diner";
+interface Props {
+  plan: MealPlan | null;
+  activeProfile: string;
+  disliked: Set<string>;
+  onToggleDislike: (name: string) => void;
+}
 
-function toMealData(r: Recipe, type: "lunch" | "dinner"): MealData {
+const DAY_ORDER = ["Zaterdag", "Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag"];
+
+function staticToMealData(r: Recipe, type: "lunch" | "dinner"): MealData {
   return {
-    id: 0, day: "", dayIndex: 0,
-    type,
-    name: r.name,
-    description: r.description,
-    calories: r.baseCalories,
-    baseCalories: r.baseCalories,
-    protein: r.protein,
-    carbs: r.carbs,
-    fat: r.fat,
-    ingredients: r.ingredients,
-    instructions: r.instructions,
+    id: 0, day: "", dayIndex: 0, type,
+    name: r.name, description: r.description,
+    calories: r.baseCalories, baseCalories: r.baseCalories,
+    protein: r.protein, carbs: r.carbs, fat: r.fat,
+    ingredients: r.ingredients, instructions: r.instructions,
   };
 }
 
-export default function RecipesView() {
-  const [filter, setFilter] = useState<Filter>("alles");
+type ViewTab = "week" | "alle";
+
+export default function RecipesView({ plan, activeProfile, disliked, onToggleDislike }: Props) {
+  const [viewTab, setViewTab] = useState<ViewTab>(plan ? "week" : "alle");
+  const [typeFilter, setTypeFilter] = useState<"alles" | "lunch" | "diner">("alles");
   const [selected, setSelected] = useState<MealData | null>(null);
 
-  const all = [
-    ...LUNCH_RECIPES.map((r) => toMealData(r, "lunch")),
-    ...DINNER_RECIPES.map((r) => toMealData(r, "dinner")),
+  // Switch to "week" tab when a plan becomes available
+  useEffect(() => {
+    if (plan) setViewTab("week");
+  }, [plan?.id]);
+
+  // --- Week tab: meals from the actual plan ---
+  const planMealsByDay = DAY_ORDER.map((day, idx) => ({
+    day,
+    lunch: plan?.meals.find((m) => m.dayIndex === idx && m.type === "lunch") ?? null,
+    dinner: plan?.meals.find((m) => m.dayIndex === idx && m.type === "dinner") ?? null,
+  }));
+
+  // --- Alle recepten tab: static library ---
+  const allStatic: MealData[] = [
+    ...LUNCH_RECIPES.map((r) => staticToMealData(r, "lunch")),
+    ...DINNER_RECIPES.map((r) => staticToMealData(r, "dinner")),
   ];
-  const visible = all.filter(
+  const visibleStatic = allStatic.filter(
     (r) =>
-      filter === "alles" ||
-      (filter === "lunch" && r.type === "lunch") ||
-      (filter === "diner" && r.type === "dinner")
+      typeFilter === "alles" ||
+      (typeFilter === "lunch" && r.type === "lunch") ||
+      (typeFilter === "diner" && r.type === "dinner")
   );
+
+  function MealRow({ meal }: { meal: MealData }) {
+    const bad = disliked.has(meal.name);
+    const kcal = meal.allCalories?.[activeProfile] ?? meal.calories;
+    return (
+      <div className={`flex items-stretch ${bad ? "opacity-60" : ""}`}>
+        <button
+          onClick={() => setSelected(meal)}
+          className="flex-1 text-left px-4 py-3 hover:bg-green-50 transition-colors group min-w-0"
+        >
+          <div className="flex justify-between items-start gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-900 group-hover:text-green-700 truncate">
+                {meal.name}
+              </p>
+              {bad && (
+                <span className="text-xs text-red-500 font-medium">👎 Niet lekker</span>
+              )}
+            </div>
+            <p className="text-sm font-medium text-orange-600 flex-shrink-0">{kcal} kcal</p>
+          </div>
+        </button>
+        <button
+          onClick={() => onToggleDislike(meal.name)}
+          title={bad ? "Verwijder 'niet lekker'" : "Markeer als niet lekker"}
+          className={`flex-shrink-0 w-10 flex items-center justify-center border-l border-gray-50 text-lg transition-colors ${
+            bad ? "text-red-400 bg-red-50" : "text-gray-200 hover:text-red-400"
+          }`}
+        >
+          👎
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>
-      <div className="flex gap-2 mb-4">
-        {(["alles", "lunch", "diner"] as Filter[]).map((f) => (
+      {/* Top tab bar */}
+      <div className="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1">
+        {plan && (
           <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-1.5 rounded-xl text-sm font-medium capitalize transition-colors ${
-              filter === f
-                ? "bg-green-600 text-white"
-                : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+            onClick={() => setViewTab("week")}
+            className={`flex-1 text-sm font-medium py-2 rounded-lg transition-colors ${
+              viewTab === "week" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            {f === "alles" ? "Alles" : f === "lunch" ? "☀️ Lunch" : "🌙 Diner"}
+            Deze week
           </button>
-        ))}
-        <span className="ml-auto text-sm text-gray-400 self-center">
-          {visible.length} recepten
-        </span>
+        )}
+        <button
+          onClick={() => setViewTab("alle")}
+          className={`flex-1 text-sm font-medium py-2 rounded-lg transition-colors ${
+            viewTab === "alle" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Alle recepten
+        </button>
       </div>
 
-      <div className="grid gap-3">
-        {visible.map((meal, i) => (
-          <button
-            key={i}
-            onClick={() => setSelected(meal)}
-            className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 text-left hover:bg-green-50 hover:border-green-200 transition-colors group"
-          >
-            <div className="flex justify-between items-start gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-xs">{meal.type === "lunch" ? "☀️" : "🌙"}</span>
-                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                    {meal.type === "lunch" ? "Lunch" : "Diner"}
-                  </span>
-                </div>
-                <p className="font-semibold text-gray-900 group-hover:text-green-700 truncate">
-                  {meal.name}
-                </p>
-                <p className="text-sm text-gray-500 truncate mt-0.5">
-                  {meal.description}
-                </p>
+      {/* WEEK TAB */}
+      {viewTab === "week" && plan && (
+        <div className="space-y-3">
+          {planMealsByDay.map(({ day, lunch, dinner }) => (
+            <div key={day} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="bg-gray-50 px-4 py-2 border-b border-gray-100">
+                <h3 className="font-semibold text-gray-800 text-sm">{day}</h3>
               </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-sm font-semibold text-orange-600">
-                  {meal.calories} kcal
-                </p>
-                <div className="flex gap-2 text-xs text-gray-400 mt-0.5">
-                  <span>E {meal.protein}g</span>
-                  <span>K {meal.carbs}g</span>
-                  <span>V {meal.fat}g</span>
-                </div>
+              <div className="divide-y divide-gray-50">
+                {lunch ? (
+                  <MealRow meal={lunch} />
+                ) : (
+                  <p className="px-4 py-3 text-sm text-gray-400">☀️ Lunch — niet beschikbaar</p>
+                )}
+                {dinner ? (
+                  <MealRow meal={dinner} />
+                ) : (
+                  <p className="px-4 py-3 text-sm text-gray-400">🌙 Diner — niet beschikbaar</p>
+                )}
               </div>
             </div>
-          </button>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      <RecipeModal meal={selected} onClose={() => setSelected(null)} />
+      {/* ALLE RECEPTEN TAB */}
+      {viewTab === "alle" && (
+        <>
+          <div className="flex gap-2 mb-3">
+            {(["alles", "lunch", "diner"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setTypeFilter(f)}
+                className={`px-4 py-1.5 rounded-xl text-sm font-medium transition-colors ${
+                  typeFilter === f
+                    ? "bg-green-600 text-white"
+                    : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                {f === "alles" ? "Alles" : f === "lunch" ? "☀️ Lunch" : "🌙 Diner"}
+              </button>
+            ))}
+            {disliked.size > 0 && (
+              <span className="ml-auto text-xs text-red-500 self-center">
+                {disliked.size} niet lekker
+              </span>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50 overflow-hidden">
+            {visibleStatic.map((meal) => (
+              <MealRow key={meal.name} meal={meal} />
+            ))}
+          </div>
+        </>
+      )}
+
+      <RecipeModal
+        meal={selected}
+        onClose={() => setSelected(null)}
+        isDisliked={selected ? disliked.has(selected.name) : false}
+        onToggleDislike={onToggleDislike}
+      />
     </div>
   );
 }

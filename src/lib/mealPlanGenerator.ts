@@ -218,7 +218,8 @@ export async function generateMealPlan(
   weightKg: number,
   heightCm = 170,
   age = 35,
-  gender: "man" | "vrouw" = "man"
+  gender: "man" | "vrouw" = "man",
+  dislikedNames: string[] = []
 ): Promise<{
   weekStart: Date;
   weekEnd: Date;
@@ -233,8 +234,11 @@ export async function generateMealPlan(
 
   // Use week number as seed so same week always gives same menu
   const seed = Math.floor(saturday.getTime() / (7 * 24 * 60 * 60 * 1000));
-  const lunches = shuffle(LUNCH_RECIPES, seed).slice(0, 7);
-  const dinners = shuffle(DINNER_RECIPES, seed + 1).slice(0, 7);
+  const lunchPool = LUNCH_RECIPES.filter((r) => !dislikedNames.includes(r.name));
+  const dinnerPool = DINNER_RECIPES.filter((r) => !dislikedNames.includes(r.name));
+  // Fall back to full list if too many dislikes to fill a week
+  const lunches = shuffle(lunchPool.length >= 7 ? lunchPool : LUNCH_RECIPES, seed).slice(0, 7);
+  const dinners = shuffle(dinnerPool.length >= 7 ? dinnerPool : DINNER_RECIPES, seed + 1).slice(0, 7);
 
   const meals: GeneratedMeal[] = [];
   for (let i = 0; i < 7; i++) {

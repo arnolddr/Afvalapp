@@ -33,6 +33,7 @@ export default function Home() {
   const [loadingData, setLoadingData] = useState(true);
   const [snacksRefresh, setSnacksRefresh] = useState(0);
   const [profilesData, setProfilesData] = useState<Record<string, ProfileData>>({});
+  const [disliked, setDisliked] = useState<Set<string>>(new Set());
 
   const latestWeight = weights[0]?.weight ?? null;
   const isThursday = new Date().getDay() === 4;
@@ -59,7 +60,24 @@ export default function Home() {
 
   useEffect(() => {
     fetchProfiles();
+    fetch("/api/disliked-meals")
+      .then((r) => r.json())
+      .then((names: string[]) => setDisliked(new Set(names)));
   }, []);
+
+  async function toggleDislike(mealName: string) {
+    const isDis = disliked.has(mealName);
+    await fetch("/api/disliked-meals", {
+      method: isDis ? "DELETE" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mealName }),
+    });
+    setDisliked((prev) => {
+      const s = new Set(prev);
+      isDis ? s.delete(mealName) : s.add(mealName);
+      return s;
+    });
+  }
 
   useEffect(() => {
     setLoadingData(true);
@@ -198,10 +216,12 @@ export default function Home() {
 
         {/* Recepten */}
         {tab === "recepten" && (
-          <>
-            <h2 className="text-lg font-semibold text-gray-900">Alle recepten</h2>
-            <RecipesView />
-          </>
+          <RecipesView
+            plan={currentPlan ?? null}
+            activeProfile={profile}
+            disliked={disliked}
+            onToggleDislike={toggleDislike}
+          />
         )}
 
         {/* Boodschappen */}

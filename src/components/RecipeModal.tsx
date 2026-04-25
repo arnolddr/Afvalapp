@@ -9,11 +9,13 @@ interface Props {
   meal: MealData | null;
   onClose: () => void;
   defaultServings?: number;
+  isDisliked?: boolean;
+  onToggleDislike?: (mealName: string) => void;
 }
 
 type Tab = "samen" | string;
 
-export default function RecipeModal({ meal, onClose, defaultServings = 2 }: Props) {
+export default function RecipeModal({ meal, onClose, defaultServings = 2, isDisliked, onToggleDislike }: Props) {
   const [servings, setServings] = useState(defaultServings);
   const [tab, setTab] = useState<Tab>("samen");
 
@@ -95,12 +97,27 @@ export default function RecipeModal({ meal, onClose, defaultServings = 2 }: Prop
               <h2 className="text-xl font-bold text-gray-900 mt-2">{meal.name}</h2>
               <p className="text-gray-600 text-sm mt-1">{meal.description}</p>
             </div>
-            <button
-              onClick={onClose}
-              className="ml-4 text-gray-400 hover:text-gray-600 text-2xl leading-none"
-            >
-              ×
-            </button>
+            <div className="ml-4 flex items-center gap-2 flex-shrink-0">
+              {onToggleDislike && (
+                <button
+                  onClick={() => onToggleDislike(meal.name)}
+                  title={isDisliked ? "Verwijder 'niet lekker'" : "Markeer als niet lekker"}
+                  className={`text-sm px-2.5 py-1 rounded-lg border transition-colors ${
+                    isDisliked
+                      ? "bg-red-50 border-red-200 text-red-600"
+                      : "bg-gray-50 border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200"
+                  }`}
+                >
+                  {isDisliked ? "👎 Niet lekker" : "👎"}
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
           </div>
 
           {/* Macro grid */}

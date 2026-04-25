@@ -13,11 +13,17 @@ export async function POST(req: NextRequest) {
     .prepare("SELECT height, age, gender FROM Profile WHERE name = ?")
     .get(profile) as { height: number; age: number; gender: string } | undefined;
 
+  const dislikedRows = db
+    .prepare("SELECT mealName FROM DislikedMeal")
+    .all() as { mealName: string }[];
+  const dislikedNames = dislikedRows.map((r) => r.mealName);
+
   const { weekStart, weekEnd, targetCalories, meals } = await generateMealPlan(
     weight,
     profileRow?.height ?? 170,
     profileRow?.age ?? 35,
-    (profileRow?.gender ?? "man") as "man" | "vrouw"
+    (profileRow?.gender ?? "man") as "man" | "vrouw",
+    dislikedNames
   );
 
   const weekStartISO = weekStart.toISOString();
