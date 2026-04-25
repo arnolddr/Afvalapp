@@ -26,7 +26,8 @@ interface Recipe {
   instructions: string[];
 }
 
-const LUNCH_RECIPES: Recipe[] = [
+export type { Recipe };
+export const LUNCH_RECIPES: Recipe[] = [
   {
     name: "Griekse salade met gegrilde kip",
     description: "Frisse salade met komkommer, tomaat, feta en gegrilde kipfilet.",
@@ -99,7 +100,7 @@ const LUNCH_RECIPES: Recipe[] = [
   },
 ];
 
-const DINNER_RECIPES: Recipe[] = [
+export const DINNER_RECIPES: Recipe[] = [
   {
     name: "Zalm met geroosterde groenten en zoete aardappel",
     description: "Sappige zalmfilet met kleurrijke geroosterde groenten en zoete aardappelpuree.",
