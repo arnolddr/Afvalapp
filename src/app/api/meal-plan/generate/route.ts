@@ -14,16 +14,16 @@ export async function POST(req: NextRequest) {
     .get(profile) as { height: number; age: number; gender: string } | undefined;
 
   const dislikedRows = db
-    .prepare("SELECT mealName FROM DislikedMeal")
-    .all() as { mealName: string }[];
-  const dislikedNames = dislikedRows.map((r) => r.mealName);
+    .prepare("SELECT ingredient FROM DislikedIngredient")
+    .all() as { ingredient: string }[];
+  const dislikedIngredients = dislikedRows.map((r) => r.ingredient);
 
   const { weekStart, weekEnd, targetCalories, meals } = await generateMealPlan(
     weight,
     profileRow?.height ?? 170,
     profileRow?.age ?? 35,
     (profileRow?.gender ?? "man") as "man" | "vrouw",
-    dislikedNames
+    dislikedIngredients
   );
 
   const weekStartISO = weekStart.toISOString();

@@ -71,9 +71,9 @@ if (isBuildPhase) {
       eatsSnacks INTEGER NOT NULL DEFAULT 0
     );
 
-    CREATE TABLE IF NOT EXISTS DislikedMeal (
-      id       INTEGER PRIMARY KEY AUTOINCREMENT,
-      mealName TEXT    NOT NULL UNIQUE
+    CREATE TABLE IF NOT EXISTS DislikedIngredient (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      ingredient TEXT    NOT NULL UNIQUE
     );
   `);
 

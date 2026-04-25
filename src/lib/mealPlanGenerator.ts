@@ -214,12 +214,19 @@ interface GeneratedMeal {
   baseCalories: number;
 }
 
+function containsDisliked(recipe: Recipe, disliked: string[]): boolean {
+  if (disliked.length === 0) return false;
+  return recipe.ingredients.some((ing) =>
+    disliked.some((d) => ing.toLowerCase().includes(d))
+  );
+}
+
 export async function generateMealPlan(
   weightKg: number,
   heightCm = 170,
   age = 35,
   gender: "man" | "vrouw" = "man",
-  dislikedNames: string[] = []
+  dislikedIngredients: string[] = []
 ): Promise<{
   weekStart: Date;
   weekEnd: Date;
@@ -234,9 +241,9 @@ export async function generateMealPlan(
 
   // Use week number as seed so same week always gives same menu
   const seed = Math.floor(saturday.getTime() / (7 * 24 * 60 * 60 * 1000));
-  const lunchPool = LUNCH_RECIPES.filter((r) => !dislikedNames.includes(r.name));
-  const dinnerPool = DINNER_RECIPES.filter((r) => !dislikedNames.includes(r.name));
-  // Fall back to full list if too many dislikes to fill a week
+  const lunchPool = LUNCH_RECIPES.filter((r) => !containsDisliked(r, dislikedIngredients));
+  const dinnerPool = DINNER_RECIPES.filter((r) => !containsDisliked(r, dislikedIngredients));
+  // Fall back to full list if too many exclusions to fill a week
   const lunches = shuffle(lunchPool.length >= 7 ? lunchPool : LUNCH_RECIPES, seed).slice(0, 7);
   const dinners = shuffle(dinnerPool.length >= 7 ? dinnerPool : DINNER_RECIPES, seed + 1).slice(0, 7);
 
