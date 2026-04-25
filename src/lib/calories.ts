@@ -33,7 +33,8 @@ export function calculateLunchDinnerSplit(totalCalories: number): {
 export function getNextSaturday(): Date {
   const today = new Date();
   const day = today.getDay(); // 0=Sun, 6=Sat
-  const daysUntilSaturday = day === 6 ? 7 : (6 - day + 7) % 7 || 7;
+  // On Saturday itself return today (week starts today); otherwise next Saturday
+  const daysUntilSaturday = (6 - day + 7) % 7;
   const saturday = new Date(today);
   saturday.setDate(today.getDate() + daysUntilSaturday);
   saturday.setHours(0, 0, 0, 0);

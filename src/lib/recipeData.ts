@@ -22,5 +22,5 @@ export const RECIPE_BASE_CALORIES: Record<string, number> = {
   "Zelfgemaakte groentepizza op volkoren bodem": 540,
   "Stoofpotje kikkererwten met spinazie": 470,
   "Kabeljauw in papillot met groenten": 480,
-  "Turkse köfte met tzatziki en rijst": 550,
+  "Turkse kofte met tzatziki en rijst": 550,
 };
