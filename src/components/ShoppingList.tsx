@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { fetchQueued, drainQueue } from "@/lib/offlineStore";
 
 interface Category {
   label: string;
@@ -25,11 +26,12 @@ export default function ShoppingList() {
   const [cachedAt, setCachedAt] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load check-off state immediately
+    // Load local check state immediately while we fetch from server
     const savedChecked = localStorage.getItem(CHECKED_KEY);
-    if (savedChecked) setChecked(JSON.parse(savedChecked));
+    const localChecked: Record<string, boolean> = savedChecked ? JSON.parse(savedChecked) : {};
+    setChecked(localChecked);
 
-    // Load cached list immediately so it shows while fetching
+    // Load cached shopping list immediately
     const saved = localStorage.getItem(DATA_KEY);
     if (saved) {
       const { data: cachedData, at } = JSON.parse(saved);
@@ -38,7 +40,22 @@ export default function ShoppingList() {
       setLoading(false);
     }
 
-    // Try to fetch fresh data from the Pi
+    // Fetch shared check state from Pi — both devices see each other's vinkjes
+    fetch("/api/shopping-checked")
+      .then((r) => r.json())
+      .then((serverChecked: Record<string, boolean>) => {
+        // Merge: if either server or local says checked, it's checked
+        const merged: Record<string, boolean> = { ...localChecked };
+        for (const [key, val] of Object.entries(serverChecked)) {
+          if (val) merged[key] = true;
+        }
+        setChecked(merged);
+        localStorage.setItem(CHECKED_KEY, JSON.stringify(merged));
+        drainQueue().catch(() => {});
+      })
+      .catch(() => {/* offline — keep local state */});
+
+    // Fetch fresh shopping list
     fetch("/api/shopping-list")
       .then((r) => r.json())
       .then((fresh: ShoppingData) => {
@@ -48,9 +65,7 @@ export default function ShoppingList() {
         setCachedAt(now);
         localStorage.setItem(DATA_KEY, JSON.stringify({ data: fresh, at: now }));
       })
-      .catch(() => {
-        setOffline(true);
-      })
+      .catch(() => setOffline(true))
       .finally(() => setLoading(false));
   }, []);
 
@@ -58,6 +73,8 @@ export default function ShoppingList() {
     setChecked((prev) => {
       const next = { ...prev, [key]: !prev[key] };
       localStorage.setItem(CHECKED_KEY, JSON.stringify(next));
+      // Sync to Pi so the other person sees it too (queued if offline)
+      fetchQueued("/api/shopping-checked", "PATCH", { item: key, checked: next[key] }).catch(() => {});
       return next;
     });
   }
@@ -65,6 +82,7 @@ export default function ShoppingList() {
   function clearChecked() {
     setChecked({});
     localStorage.removeItem(CHECKED_KEY);
+    fetchQueued("/api/shopping-checked", "DELETE").catch(() => {});
   }
 
   if (loading) {

@@ -75,6 +75,12 @@ if (isBuildPhase) {
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       ingredient TEXT    NOT NULL UNIQUE
     );
+
+    CREATE TABLE IF NOT EXISTS ShoppingChecked (
+      id   INTEGER PRIMARY KEY CHECK (id = 1),
+      data TEXT    NOT NULL DEFAULT '{}'
+    );
+    INSERT OR IGNORE INTO ShoppingChecked (id, data) VALUES (1, '{}');
   `);
 
   const existingProfiles = db.prepare("SELECT COUNT(*) as count FROM Profile").get() as { count: number };
