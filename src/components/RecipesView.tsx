@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { MealData, MealPlan } from "@/types";
 import RecipeModal from "./RecipeModal";
 import { LUNCH_RECIPES, DINNER_RECIPES, Recipe } from "@/lib/mealPlanGenerator";
+import { getCached, setCached, fetchQueued } from "@/lib/offlineStore";
 
 interface Props {
   plan: MealPlan | null;
@@ -43,9 +44,16 @@ export default function RecipesView({ plan, activeProfile }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    const cached = getCached<string[]>("disliked");
+    if (cached) setDisliked(cached);
+
     fetch("/api/disliked-ingredients")
       .then((r) => r.json())
-      .then(setDisliked);
+      .then((data: string[]) => {
+        setDisliked(data);
+        setCached("disliked", data);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -58,23 +66,19 @@ export default function RecipesView({ plan, activeProfile }: Props) {
       setInput("");
       return;
     }
-    await fetch("/api/disliked-ingredients", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ingredient: val }),
-    });
-    setDisliked((prev) => [...prev, val].sort());
+    const next = [...disliked, val].sort();
+    setDisliked(next);
+    setCached("disliked", next);
     setInput("");
     inputRef.current?.focus();
+    await fetchQueued("/api/disliked-ingredients", "POST", { ingredient: val });
   }
 
   async function removeIngredient(ing: string) {
-    await fetch("/api/disliked-ingredients", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ingredient: ing }),
-    });
-    setDisliked((prev) => prev.filter((d) => d !== ing));
+    const next = disliked.filter((d) => d !== ing);
+    setDisliked(next);
+    setCached("disliked", next);
+    await fetchQueued("/api/disliked-ingredients", "DELETE", { ingredient: ing });
   }
 
   const allStatic = [

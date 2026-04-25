@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { fetchQueued } from "@/lib/offlineStore";
 
 interface Props {
   profile: string;
@@ -11,7 +12,7 @@ export default function WeightInput({ profile, onWeightSaved }: Props) {
   const [weight, setWeight] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState<false | "saved" | "queued">(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -23,18 +24,15 @@ export default function WeightInput({ profile, onWeightSaved }: Props) {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/weight", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ weight: w, profile }),
-      });
-      if (!res.ok) throw new Error("Opslaan mislukt");
-      setSuccess(true);
-      setWeight("");
-      onWeightSaved(w);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch {
-      setError("Er ging iets mis. Probeer opnieuw.");
+      const { ok, queued } = await fetchQueued("/api/weight", "POST", { weight: w, profile });
+      if (ok || queued) {
+        setSuccess(queued ? "queued" : "saved");
+        setWeight("");
+        onWeightSaved(w);
+        setTimeout(() => setSuccess(false), 3000);
+      } else {
+        setError("Er ging iets mis. Probeer opnieuw.");
+      }
     } finally {
       setLoading(false);
     }
@@ -72,8 +70,11 @@ export default function WeightInput({ profile, onWeightSaved }: Props) {
         </button>
       </form>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      {success && (
+      {success === "saved" && (
         <p className="mt-2 text-sm text-green-600">Gewicht opgeslagen!</p>
+      )}
+      {success === "queued" && (
+        <p className="mt-2 text-sm text-amber-600">Opgeslagen — wordt gesynchroniseerd zodra je verbinding hebt.</p>
       )}
     </div>
   );

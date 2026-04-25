@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getCached, setCached, fetchQueued, drainQueue } from "@/lib/offlineStore";
 
 interface ProfileData {
   name: string;
@@ -31,13 +32,24 @@ export default function ProfileSelector({ activeProfile, onChange, onSnackChange
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    const cached = getCached<ProfileData[]>("profiles");
+    if (cached) {
+      const map: Record<string, ProfileData> = {};
+      for (const p of cached) map[p.name] = p;
+      setProfiles(map);
+      setLoading(false);
+    }
+
     fetch("/api/profiles")
       .then((r) => r.json())
       .then((data: ProfileData[]) => {
         const map: Record<string, ProfileData> = {};
         for (const p of data) map[p.name] = p;
         setProfiles(map);
+        setCached("profiles", data);
+        drainQueue().catch(() => {});
       })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
@@ -53,12 +65,12 @@ export default function ProfileSelector({ activeProfile, onChange, onSnackChange
 
   async function toggleSnacks(name: string) {
     const next = !profiles[name]?.eatsSnacks;
-    setProfiles((prev) => ({ ...prev, [name]: { ...prev[name], eatsSnacks: next } }));
-    await fetch("/api/profiles", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, eatsSnacks: next }),
+    setProfiles((prev) => {
+      const updated = { ...prev, [name]: { ...prev[name], eatsSnacks: next } };
+      setCached("profiles", Object.values(updated));
+      return updated;
     });
+    await fetchQueued("/api/profiles", "PATCH", { name, eatsSnacks: next });
     onSnackChange?.();
   }
 
@@ -70,27 +82,21 @@ export default function ProfileSelector({ activeProfile, onChange, onSnackChange
     const goalNum = localGoal.trim() === "" ? null : parseFloat(localGoal.replace(",", "."));
     if (goalNum !== null && (isNaN(goalNum) || goalNum < 30 || goalNum > 300)) return;
     setSaving(true);
-    await fetch("/api/profiles", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: activeProfile,
-        height: h,
-        age: a,
-        gender: localGender,
-        goalWeight: goalNum,
-      }),
+    await fetchQueued("/api/profiles", "PATCH", {
+      name: activeProfile,
+      height: h,
+      age: a,
+      gender: localGender,
+      goalWeight: goalNum,
     });
-    setProfiles((prev) => ({
-      ...prev,
-      [activeProfile]: {
-        ...prev[activeProfile],
-        height: h,
-        age: a,
-        gender: localGender,
-        goalWeight: goalNum,
-      },
-    }));
+    setProfiles((prev) => {
+      const updated = {
+        ...prev,
+        [activeProfile]: { ...prev[activeProfile], height: h, age: a, gender: localGender, goalWeight: goalNum },
+      };
+      setCached("profiles", Object.values(updated));
+      return updated;
+    });
     setSaving(false);
     setBodyOpen(false);
     onProfileSettingsChange?.();

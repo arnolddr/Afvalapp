@@ -12,8 +12,10 @@ import ProfileSelector from "@/components/ProfileSelector";
 import DailySnacks from "@/components/DailySnacks";
 import InstallBanner from "@/components/InstallBanner";
 import ProgressPanel from "@/components/ProgressPanel";
+import SyncBadge from "@/components/SyncBadge";
 import { MealPlan, WeightEntry } from "@/types";
 import { calculateWeightLossCalories } from "@/lib/calories";
+import { getCached, setCached, drainQueue } from "@/lib/offlineStore";
 
 interface ProfileData {
   name: string;
@@ -48,13 +50,21 @@ export default function Home() {
     : null;
 
   function fetchProfiles() {
+    const cached = getCached<ProfileData[]>("profiles");
+    if (cached) {
+      const map: Record<string, ProfileData> = {};
+      for (const p of cached) map[p.name] = p;
+      setProfilesData(map);
+    }
     fetch("/api/profiles")
       .then((r) => r.json())
       .then((data: ProfileData[]) => {
         const map: Record<string, ProfileData> = {};
         for (const p of data) map[p.name] = p;
         setProfilesData(map);
-      });
+        setCached("profiles", data);
+      })
+      .catch(() => {});
   }
 
   useEffect(() => {
@@ -62,17 +72,37 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    setLoadingData(true);
+    // Show cached data instantly — no loading flash when offline
+    const cached = getCached<WeightEntry[]>(`weight:${profile}`);
+    if (cached) {
+      setWeights(cached);
+      setLoadingData(false);
+    } else {
+      setLoadingData(true);
+    }
+
     fetch(`/api/weight?profile=${encodeURIComponent(profile)}`)
       .then((r) => r.json())
-      .then(setWeights)
+      .then((data: WeightEntry[]) => {
+        setWeights(data);
+        setCached(`weight:${profile}`, data);
+        drainQueue().catch(() => {});
+      })
+      .catch(() => {})
       .finally(() => setLoadingData(false));
   }, [profile]);
 
   useEffect(() => {
+    const cached = getCached<MealPlan[]>(`mealplan:${profile}`);
+    if (cached) setMealPlans(cached);
+
     fetch(`/api/meal-plan?profile=${encodeURIComponent(profile)}`)
       .then((r) => r.json())
-      .then(setMealPlans);
+      .then((plans: MealPlan[]) => {
+        setMealPlans(plans);
+        setCached(`mealplan:${profile}`, plans);
+      })
+      .catch(() => {});
   }, [profile, weights]);
 
   function handleWeightSaved(weight: number) {
@@ -82,21 +112,30 @@ export default function Home() {
       unit: "kg",
       date: new Date().toISOString(),
     };
-    setWeights((prev) => [newEntry, ...prev]);
+    setWeights((prev) => {
+      const next = [newEntry, ...prev];
+      setCached(`weight:${profile}`, next);
+      return next;
+    });
   }
 
   function handleWeightDeleted(id: number) {
-    setWeights((prev) => prev.filter((e) => e.id !== id));
+    setWeights((prev) => {
+      const next = prev.filter((e) => e.id !== id);
+      setCached(`weight:${profile}`, next);
+      return next;
+    });
   }
 
   function handlePlanGenerated(_plan: MealPlan) {
-    // Refetch from server so the UI reflects the authoritative max-2 deduplicated list
     fetch(`/api/meal-plan?profile=${encodeURIComponent(profile)}`)
       .then((r) => r.json())
-      .then((plans) => {
+      .then((plans: MealPlan[]) => {
         setMealPlans(plans);
         setSelectedPlanIdx(0);
-      });
+        setCached(`mealplan:${profile}`, plans);
+      })
+      .catch(() => {});
   }
 
   const currentPlan = mealPlans[selectedPlanIdx];
@@ -112,11 +151,14 @@ export default function Home() {
             </div>
             <h1 className="text-base font-bold text-gray-900">AfvalApp</h1>
           </div>
-          {isThursday && tab === "dashboard" && (
-            <span className="text-xs font-medium bg-green-100 text-green-700 px-2.5 py-1 rounded-full">
-              Donderdag — nieuw menu!
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            <SyncBadge />
+            {isThursday && tab === "dashboard" && (
+              <span className="text-xs font-medium bg-green-100 text-green-700 px-2.5 py-1 rounded-full">
+                Donderdag — nieuw menu!
+              </span>
+            )}
+          </div>
         </div>
         <Navigation active={tab} onChange={setTab} />
       </header>

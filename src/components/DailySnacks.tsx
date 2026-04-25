@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getCached, setCached } from "@/lib/offlineStore";
 
 interface Snack {
   name: string;
@@ -29,10 +30,22 @@ export default function DailySnacks({ refreshKey }: Props) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
+    const cached = getCached<ProfileSnacks[]>("snacks");
+    if (cached) {
+      setData(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     fetch("/api/snacks")
       .then((r) => r.json())
-      .then((d) => setData(d.profiles || []))
+      .then((d) => {
+        const profiles: ProfileSnacks[] = d.profiles || [];
+        setData(profiles);
+        setCached("snacks", profiles);
+      })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [refreshKey]);
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { WeightEntry } from "@/types";
+import { fetchQueued } from "@/lib/offlineStore";
 
 interface Props {
   entries: WeightEntry[];
@@ -72,7 +73,7 @@ export default function WeightHistory({ entries, profile, goalWeight, onDelete }
   async function handleDelete(id: number) {
     setDeletingId(id);
     try {
-      await fetch(`/api/weight/${id}`, { method: "DELETE" });
+      await fetchQueued(`/api/weight/${id}`, "DELETE");
       onDelete(id);
     } finally {
       setDeletingId(null);
