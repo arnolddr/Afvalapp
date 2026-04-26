@@ -34,13 +34,14 @@ function isExcluded(recipe: Recipe, disliked: string[]): string | null {
   return null;
 }
 
-type ViewTab = "week" | "alle";
+type ViewTab = "week" | "alle" | "favorieten";
 
 export default function RecipesView({ plan, activeProfile, onMealSwapped }: Props) {
   const [viewTab, setViewTab] = useState<ViewTab>(plan ? "week" : "alle");
   const [typeFilter, setTypeFilter] = useState<"alles" | "lunch" | "diner">("alles");
   const [selected, setSelected] = useState<MealData | null>(null);
   const [disliked, setDisliked] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [input, setInput] = useState("");
   const [swapping, setSwapping] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -54,6 +55,17 @@ export default function RecipesView({ plan, activeProfile, onMealSwapped }: Prop
       .then((data: string[]) => {
         setDisliked(data);
         setCached("disliked", data);
+      })
+      .catch(() => {});
+
+    const cachedFavs = getCached<string[]>("favorites");
+    if (cachedFavs) setFavorites(new Set(cachedFavs));
+
+    fetch("/api/favorite-recipes")
+      .then((r) => r.json())
+      .then((data: string[]) => {
+        setFavorites(new Set(data));
+        setCached("favorites", data);
       })
       .catch(() => {});
   }, []);
@@ -81,6 +93,19 @@ export default function RecipesView({ plan, activeProfile, onMealSwapped }: Prop
     setDisliked(next);
     setCached("disliked", next);
     await fetchQueued("/api/disliked-ingredients", "DELETE", { ingredient: ing });
+  }
+
+  async function toggleFavorite(name: string) {
+    const isFav = favorites.has(name);
+    const next = new Set(favorites);
+    if (isFav) next.delete(name); else next.add(name);
+    setFavorites(next);
+    setCached("favorites", Array.from(next));
+    await fetchQueued(
+      "/api/favorite-recipes",
+      isFav ? "DELETE" : "POST",
+      { name }
+    );
   }
 
   async function swapMeal(meal: MealData, type: "lunch" | "dinner") {
@@ -128,6 +153,7 @@ export default function RecipesView({ plan, activeProfile, onMealSwapped }: Prop
   }) {
     const excluded = recipe ? isExcluded(recipe, disliked) : null;
     const kcal = meal.allCalories?.[activeProfile] ?? meal.calories;
+    const isFav = favorites.has(meal.name);
     return (
       <div className={`flex items-stretch hover:bg-green-50 transition-colors ${excluded ? "opacity-60" : ""}`}>
         <button
@@ -147,6 +173,17 @@ export default function RecipesView({ plan, activeProfile, onMealSwapped }: Prop
             </div>
             <p className="text-sm font-medium text-orange-600 flex-shrink-0">{kcal} kcal</p>
           </div>
+        </button>
+        <button
+          onClick={() => toggleFavorite(meal.name)}
+          title={isFav ? "Verwijder uit favorieten" : "Markeer als favoriet"}
+          className={`px-3 border-l border-gray-100 transition-colors flex-shrink-0 text-base ${
+            isFav
+              ? "text-yellow-400 hover:text-yellow-500 hover:bg-yellow-50"
+              : "text-gray-300 hover:text-yellow-400 hover:bg-yellow-50"
+          }`}
+        >
+          ★
         </button>
         {excluded && onSwap && (
           <button
@@ -238,7 +275,7 @@ export default function RecipesView({ plan, activeProfile, onMealSwapped }: Prop
         {plan && (
           <button
             onClick={() => setViewTab("week")}
-            className={`flex-1 text-sm font-medium py-2 rounded-lg transition-colors ${
+            className={`flex-1 text-xs font-medium py-2 rounded-lg transition-colors ${
               viewTab === "week" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
             }`}
           >
@@ -247,11 +284,19 @@ export default function RecipesView({ plan, activeProfile, onMealSwapped }: Prop
         )}
         <button
           onClick={() => setViewTab("alle")}
-          className={`flex-1 text-sm font-medium py-2 rounded-lg transition-colors ${
+          className={`flex-1 text-xs font-medium py-2 rounded-lg transition-colors ${
             viewTab === "alle" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
           }`}
         >
           Alle recepten
+        </button>
+        <button
+          onClick={() => setViewTab("favorieten")}
+          className={`flex-1 text-xs font-medium py-2 rounded-lg transition-colors ${
+            viewTab === "favorieten" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          ★ Favorieten{favorites.size > 0 && ` (${favorites.size})`}
         </button>
       </div>
 
@@ -325,6 +370,25 @@ export default function RecipesView({ plan, activeProfile, onMealSwapped }: Prop
             ))}
           </div>
         </>
+      )}
+
+      {/* FAVORIETEN TAB */}
+      {viewTab === "favorieten" && (
+        favorites.size === 0 ? (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+            <p className="text-3xl mb-3">★</p>
+            <p className="text-gray-600 font-medium">Nog geen favorieten</p>
+            <p className="text-gray-400 text-sm mt-1">Druk op ★ bij een recept om het op te slaan.</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50 overflow-hidden">
+            {allStatic
+              .filter(({ data }) => favorites.has(data.name))
+              .map(({ data, recipe }) => (
+                <MealRow key={data.name} meal={data} recipe={recipe} />
+              ))}
+          </div>
+        )
       )}
 
       <RecipeModal meal={selected} onClose={() => setSelected(null)} />

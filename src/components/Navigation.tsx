@@ -1,6 +1,6 @@
 "use client";
 
-type Tab = "dashboard" | "recepten" | "boodschappen";
+type Tab = "dashboard" | "recepten" | "boodschappen" | "gewicht";
 
 interface Props {
   active: Tab;
@@ -11,6 +11,7 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "dashboard", label: "Dashboard", icon: "🏠" },
   { id: "recepten", label: "Recepten", icon: "📖" },
   { id: "boodschappen", label: "Boodschappen", icon: "🛒" },
+  { id: "gewicht", label: "Gewicht", icon: "⚖️" },
 ];
 
 export default function Navigation({ active, onChange }: Props) {
@@ -20,7 +21,7 @@ export default function Navigation({ active, onChange }: Props) {
         <button
           key={tab.id}
           onClick={() => onChange(tab.id)}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors border-b-2 ${
+          className={`flex-1 flex items-center justify-center gap-1 py-3 text-xs font-medium transition-colors border-b-2 ${
             active === tab.id
               ? "border-green-600 text-green-700"
               : "border-transparent text-gray-500 hover:text-gray-700"

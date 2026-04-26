@@ -13,6 +13,7 @@ import DailySnacks from "@/components/DailySnacks";
 import InstallBanner from "@/components/InstallBanner";
 import ProgressPanel from "@/components/ProgressPanel";
 import SyncBadge from "@/components/SyncBadge";
+import WeightTab from "@/components/WeightTab";
 import { MealPlan, WeightEntry } from "@/types";
 import { calculateWeightLossCalories } from "@/lib/calories";
 import { getCached, setCached, drainQueue } from "@/lib/offlineStore";
@@ -94,12 +95,16 @@ export default function Home() {
 
   useEffect(() => {
     const cached = getCached<MealPlan[]>(`mealplan:${profile}`);
-    if (cached) setMealPlans(cached);
+    if (cached) {
+      setMealPlans(cached);
+      setSelectedPlanIdx(findCurrentPlanIdx(cached));
+    }
 
     fetch(`/api/meal-plan?profile=${encodeURIComponent(profile)}`)
       .then((r) => r.json())
       .then((plans: MealPlan[]) => {
         setMealPlans(plans);
+        setSelectedPlanIdx(findCurrentPlanIdx(plans));
         setCached(`mealplan:${profile}`, plans);
       })
       .catch(() => {});
@@ -127,12 +132,23 @@ export default function Home() {
     });
   }
 
+function findCurrentPlanIdx(plans: MealPlan[]): number {
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    for (let i = 0; i < plans.length; i++) {
+      const start = new Date(plans[i].weekStart);
+      const end = new Date(plans[i].weekEnd);
+      if (today >= start && today <= end) return i;
+    }
+    return 0;
+  }
+
   function refreshPlans() {
     fetch(`/api/meal-plan?profile=${encodeURIComponent(profile)}`)
       .then((r) => r.json())
       .then((plans: MealPlan[]) => {
         setMealPlans(plans);
-        setSelectedPlanIdx(0);
+        setSelectedPlanIdx(findCurrentPlanIdx(plans));
         setCached(`mealplan:${profile}`, plans);
       })
       .catch(() => {});
@@ -249,6 +265,15 @@ export default function Home() {
 
         {/* Boodschappen */}
         {tab === "boodschappen" && <ShoppingList />}
+
+        {/* Gewicht */}
+        {tab === "gewicht" && (
+          <WeightTab
+            entries={weights}
+            goalWeight={activeProfileData?.goalWeight ?? null}
+            profile={profile}
+          />
+        )}
       </main>
 
       <InstallBanner />

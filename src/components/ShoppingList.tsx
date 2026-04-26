@@ -44,10 +44,11 @@ export default function ShoppingList() {
     fetch("/api/shopping-checked")
       .then((r) => r.json())
       .then((serverChecked: Record<string, boolean>) => {
-        // Merge: if either server or local says checked, it's checked
-        const merged: Record<string, boolean> = { ...localChecked };
-        for (const [key, val] of Object.entries(serverChecked)) {
-          if (val) merged[key] = true;
+        // Server is authoritative. Keep local items the server doesn't know about yet
+        // (pending offline mutations), but let server's unchecked state propagate.
+        const merged: Record<string, boolean> = { ...serverChecked };
+        for (const [key, val] of Object.entries(localChecked)) {
+          if (!(key in serverChecked) && val) merged[key] = true;
         }
         setChecked(merged);
         localStorage.setItem(CHECKED_KEY, JSON.stringify(merged));

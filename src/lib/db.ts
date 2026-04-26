@@ -81,6 +81,11 @@ if (isBuildPhase) {
       data TEXT    NOT NULL DEFAULT '{}'
     );
     INSERT OR IGNORE INTO ShoppingChecked (id, data) VALUES (1, '{}');
+
+    CREATE TABLE IF NOT EXISTS FavoriteRecipe (
+      id   INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT    NOT NULL UNIQUE
+    );
   `);
 
   const existingProfiles = db.prepare("SELECT COUNT(*) as count FROM Profile").get() as { count: number };
