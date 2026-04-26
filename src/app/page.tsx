@@ -127,7 +127,7 @@ export default function Home() {
     });
   }
 
-  function handlePlanGenerated(_plan: MealPlan) {
+  function refreshPlans() {
     fetch(`/api/meal-plan?profile=${encodeURIComponent(profile)}`)
       .then((r) => r.json())
       .then((plans: MealPlan[]) => {
@@ -136,6 +136,10 @@ export default function Home() {
         setCached(`mealplan:${profile}`, plans);
       })
       .catch(() => {});
+  }
+
+  function handlePlanGenerated(_plan: MealPlan) {
+    refreshPlans();
   }
 
   const currentPlan = mealPlans[selectedPlanIdx];
@@ -240,7 +244,7 @@ export default function Home() {
 
         {/* Recepten */}
         {tab === "recepten" && (
-          <RecipesView plan={currentPlan ?? null} activeProfile={profile} />
+          <RecipesView plan={currentPlan ?? null} activeProfile={profile} onMealSwapped={refreshPlans} />
         )}
 
         {/* Boodschappen */}

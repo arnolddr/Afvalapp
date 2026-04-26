@@ -9,6 +9,7 @@ import { getCached, setCached, fetchQueued } from "@/lib/offlineStore";
 interface Props {
   plan: MealPlan | null;
   activeProfile: string;
+  onMealSwapped?: () => void;
 }
 
 const DAY_ORDER = ["Zaterdag", "Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag"];
@@ -35,12 +36,13 @@ function isExcluded(recipe: Recipe, disliked: string[]): string | null {
 
 type ViewTab = "week" | "alle";
 
-export default function RecipesView({ plan, activeProfile }: Props) {
+export default function RecipesView({ plan, activeProfile, onMealSwapped }: Props) {
   const [viewTab, setViewTab] = useState<ViewTab>(plan ? "week" : "alle");
   const [typeFilter, setTypeFilter] = useState<"alles" | "lunch" | "diner">("alles");
   const [selected, setSelected] = useState<MealData | null>(null);
   const [disliked, setDisliked] = useState<string[]>([]);
   const [input, setInput] = useState("");
+  const [swapping, setSwapping] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -81,6 +83,33 @@ export default function RecipesView({ plan, activeProfile }: Props) {
     await fetchQueued("/api/disliked-ingredients", "DELETE", { ingredient: ing });
   }
 
+  async function swapMeal(meal: MealData, type: "lunch" | "dinner") {
+    if (!plan || swapping !== null) return;
+
+    const pool = (type === "lunch" ? LUNCH_RECIPES : DINNER_RECIPES)
+      .filter((r) => isExcluded(r, disliked) === null);
+
+    const usedNames = new Set(plan.meals.map((m) => m.name));
+    usedNames.delete(meal.name);
+    const candidates = pool.filter((r) => !usedNames.has(r.name));
+    const finalPool = candidates.length > 0 ? candidates : pool;
+    if (finalPool.length === 0) return;
+
+    const pick = finalPool[Math.floor(Math.random() * finalPool.length)];
+
+    setSwapping(meal.id);
+    try {
+      const res = await fetch("/api/meal-plan/swap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mealId: meal.id, newName: pick.name }),
+      });
+      if (res.ok) onMealSwapped?.();
+    } finally {
+      setSwapping(null);
+    }
+  }
+
   const allStatic = [
     ...LUNCH_RECIPES.map((r) => ({ data: staticToMealData(r, "lunch"), recipe: r })),
     ...DINNER_RECIPES.map((r) => ({ data: staticToMealData(r, "dinner"), recipe: r })),
@@ -88,28 +117,52 @@ export default function RecipesView({ plan, activeProfile }: Props) {
 
   const excludedCount = allStatic.filter(({ recipe }) => isExcluded(recipe, disliked) !== null).length;
 
-  function MealRow({ meal, recipe }: { meal: MealData; recipe?: Recipe }) {
+  function MealRow({
+    meal,
+    recipe,
+    onSwap,
+  }: {
+    meal: MealData;
+    recipe?: Recipe;
+    onSwap?: () => void;
+  }) {
     const excluded = recipe ? isExcluded(recipe, disliked) : null;
     const kcal = meal.allCalories?.[activeProfile] ?? meal.calories;
     return (
-      <button
-        onClick={() => setSelected(meal)}
-        className={`w-full text-left px-4 py-3 hover:bg-green-50 transition-colors group ${excluded ? "opacity-50" : ""}`}
-      >
-        <div className="flex justify-between items-start gap-2">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-900 group-hover:text-green-700 truncate">
-              {meal.name}
-            </p>
-            {excluded && (
-              <p className="text-xs text-red-500 mt-0.5">
-                Uitgesloten — bevat &ldquo;{excluded}&rdquo;
+      <div className={`flex items-stretch hover:bg-green-50 transition-colors ${excluded ? "opacity-60" : ""}`}>
+        <button
+          onClick={() => setSelected(meal)}
+          className="flex-1 text-left px-4 py-3 min-w-0 group"
+        >
+          <div className="flex justify-between items-start gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-900 group-hover:text-green-700 truncate">
+                {meal.name}
               </p>
-            )}
+              {excluded && (
+                <p className="text-xs text-red-500 mt-0.5">
+                  Uitgesloten — bevat &ldquo;{excluded}&rdquo;
+                </p>
+              )}
+            </div>
+            <p className="text-sm font-medium text-orange-600 flex-shrink-0">{kcal} kcal</p>
           </div>
-          <p className="text-sm font-medium text-orange-600 flex-shrink-0">{kcal} kcal</p>
-        </div>
-      </button>
+        </button>
+        {excluded && onSwap && (
+          <button
+            onClick={onSwap}
+            disabled={swapping === meal.id}
+            title="Verwissel dit gerecht"
+            className="px-3 border-l border-gray-100 text-amber-500 hover:text-amber-700 hover:bg-amber-50 transition-colors flex-shrink-0 disabled:opacity-40 text-base"
+          >
+            {swapping === meal.id ? (
+              <span className="text-xs">...</span>
+            ) : (
+              "↻"
+            )}
+          </button>
+        )}
+      </div>
     );
   }
 
@@ -140,7 +193,6 @@ export default function RecipesView({ plan, activeProfile }: Props) {
           </div>
         </div>
 
-        {/* Tag list */}
         {disliked.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-3">
             {disliked.map((ing) => (
@@ -161,7 +213,6 @@ export default function RecipesView({ plan, activeProfile }: Props) {
           </div>
         )}
 
-        {/* Add input */}
         <div className="flex gap-2">
           <input
             ref={inputRef}
@@ -208,21 +259,38 @@ export default function RecipesView({ plan, activeProfile }: Props) {
       {viewTab === "week" && plan && (
         <div className="space-y-3">
           {planDays.map(({ day, lunch, dinner }) => {
-            const lunchRecipe = lunch ? [...LUNCH_RECIPES, ...DINNER_RECIPES].find((r) => r.name === lunch.name) : null;
-            const dinnerRecipe = dinner ? [...LUNCH_RECIPES, ...DINNER_RECIPES].find((r) => r.name === dinner.name) : null;
+            const lunchRecipe = lunch
+              ? [...LUNCH_RECIPES, ...DINNER_RECIPES].find((r) => r.name === lunch.name)
+              : null;
+            const dinnerRecipe = dinner
+              ? [...LUNCH_RECIPES, ...DINNER_RECIPES].find((r) => r.name === dinner.name)
+              : null;
+            const lunchExcluded = lunchRecipe ? isExcluded(lunchRecipe, disliked) !== null : false;
+            const dinnerExcluded = dinnerRecipe ? isExcluded(dinnerRecipe, disliked) !== null : false;
             return (
-              <div key={day} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div
+                key={day}
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+              >
                 <div className="bg-gray-50 px-4 py-2 border-b border-gray-100">
                   <h3 className="font-semibold text-gray-800 text-sm">{day}</h3>
                 </div>
                 <div className="divide-y divide-gray-50">
                   {lunch ? (
-                    <MealRow meal={lunch} recipe={lunchRecipe ?? undefined} />
+                    <MealRow
+                      meal={lunch}
+                      recipe={lunchRecipe ?? undefined}
+                      onSwap={lunchExcluded ? () => swapMeal(lunch, "lunch") : undefined}
+                    />
                   ) : (
                     <p className="px-4 py-3 text-sm text-gray-400">☀️ Lunch — niet beschikbaar</p>
                   )}
                   {dinner ? (
-                    <MealRow meal={dinner} recipe={dinnerRecipe ?? undefined} />
+                    <MealRow
+                      meal={dinner}
+                      recipe={dinnerRecipe ?? undefined}
+                      onSwap={dinnerExcluded ? () => swapMeal(dinner, "dinner") : undefined}
+                    />
                   ) : (
                     <p className="px-4 py-3 text-sm text-gray-400">🌙 Diner — niet beschikbaar</p>
                   )}
