@@ -86,6 +86,28 @@ if (isBuildPhase) {
       id   INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT    NOT NULL UNIQUE
     );
+
+    CREATE TABLE IF NOT EXISTS User (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      username     TEXT    NOT NULL UNIQUE,
+      passwordHash TEXT    NOT NULL,
+      totpSecret   TEXT,
+      totpVerified INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS Session (
+      token     TEXT    PRIMARY KEY,
+      userId    INTEGER NOT NULL,
+      createdAt TEXT    NOT NULL DEFAULT (datetime('now')),
+      expiresAt TEXT    NOT NULL,
+      FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS PendingAuth (
+      token     TEXT    PRIMARY KEY,
+      userId    INTEGER NOT NULL,
+      expiresAt TEXT    NOT NULL
+    );
   `);
 
   const existingProfiles = db.prepare("SELECT COUNT(*) as count FROM Profile").get() as { count: number };
