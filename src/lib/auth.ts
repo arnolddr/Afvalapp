@@ -95,5 +95,5 @@ export const COOKIE_OPTIONS = {
   sameSite: "lax" as const,
   path: "/",
   maxAge: 30 * 24 * 60 * 60,
-  secure: process.env.NODE_ENV === "production",
+  // secure niet instellen: app draait op HTTP achter Cloudflare/lokaal netwerk
 };
