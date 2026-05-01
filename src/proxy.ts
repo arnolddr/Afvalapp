@@ -25,7 +25,7 @@ export function proxy(request: NextRequest) {
 
   try {
     const valid = db
-      .prepare("SELECT 1 FROM Session WHERE token = ? AND expiresAt > datetime('now')")
+      .prepare("SELECT 1 FROM Session WHERE token = ? AND expiresAt > strftime('%s', 'now')")
       .get(token);
     if (!valid) return unauthenticated(request);
   } catch {

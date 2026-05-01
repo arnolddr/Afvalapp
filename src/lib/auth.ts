@@ -13,7 +13,7 @@ interface SessionJoinRow { userId: number; username: string }
 
 export function createSession(userId: number): string {
   const token = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const expiresAt = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60; // Unix timestamp
   db.prepare("INSERT INTO Session (token, userId, expiresAt) VALUES (?, ?, ?)").run(token, userId, expiresAt);
   return token;
 }
@@ -22,7 +22,7 @@ export function validateSession(token: string): SessionUser | null {
   const row = db.prepare(`
     SELECT s.userId, u.username FROM Session s
     JOIN User u ON u.id = s.userId
-    WHERE s.token = ? AND s.expiresAt > datetime('now')
+    WHERE s.token = ? AND s.expiresAt > strftime('%s', 'now')
   `).get(token) as SessionJoinRow | undefined;
   return row ? { id: row.userId, username: row.username } : null;
 }
@@ -54,7 +54,7 @@ export function countUsers(): number {
 
 export function createPendingAuth(userId: number): string {
   const token = crypto.randomBytes(16).toString("hex");
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+  const expiresAt = Math.floor(Date.now() / 1000) + 10 * 60; // Unix timestamp, 10 minuten
   db.prepare("DELETE FROM PendingAuth WHERE userId = ?").run(userId);
   db.prepare("INSERT INTO PendingAuth (token, userId, expiresAt) VALUES (?, ?, ?)").run(token, userId, expiresAt);
   return token;
@@ -62,7 +62,7 @@ export function createPendingAuth(userId: number): string {
 
 export function consumePendingAuth(token: string): number | null {
   const row = db.prepare(
-    "SELECT userId FROM PendingAuth WHERE token = ? AND expiresAt > datetime('now')"
+    "SELECT userId FROM PendingAuth WHERE token = ? AND expiresAt > strftime('%s', 'now')"
   ).get(token) as PendingRow | undefined;
   if (row) db.prepare("DELETE FROM PendingAuth WHERE token = ?").run(token);
   return row?.userId ?? null;
