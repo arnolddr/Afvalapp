@@ -4,6 +4,7 @@ import {
   getNextSaturday,
   getWeekDays,
 } from "./calories";
+import { calculateRecipeMacros } from "./nutrition";
 
 const DAYS_NL = [
   "Zaterdag",
@@ -18,16 +19,19 @@ const DAYS_NL = [
 interface Recipe {
   name: string;
   description: string;
-  baseCalories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
   ingredients: string[];
   instructions: string[];
+  // Legacy fields — ignored at runtime; macros are computed from ingredients
+  baseCalories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
 }
 
 export type { Recipe };
-export const LUNCH_RECIPES: Recipe[] = [
+
+// Core recipe lists — extended by recipesExtra.ts below
+const CORE_LUNCH_RECIPES: Recipe[] = [
   {
     name: "Griekse salade met gegrilde kip",
     description: "Frisse salade met komkommer, tomaat, feta en gegrilde kipfilet.",
@@ -100,7 +104,7 @@ export const LUNCH_RECIPES: Recipe[] = [
   },
 ];
 
-export const DINNER_RECIPES: Recipe[] = [
+const CORE_DINNER_RECIPES: Recipe[] = [
   {
     name: "Zalm met geroosterde groenten en zoete aardappel",
     description: "Sappige zalmfilet met kleurrijke geroosterde groenten en zoete aardappelpuree.",
@@ -173,6 +177,10 @@ export const DINNER_RECIPES: Recipe[] = [
   },
 ];
 
+import { EXTRA_LUNCH_RECIPES, EXTRA_DINNER_RECIPES } from "./recipesExtra";
+export const LUNCH_RECIPES: Recipe[] = [...CORE_LUNCH_RECIPES, ...EXTRA_LUNCH_RECIPES];
+export const DINNER_RECIPES: Recipe[] = [...CORE_DINNER_RECIPES, ...EXTRA_DINNER_RECIPES];
+
 function shuffle<T>(arr: T[], seed: number): T[] {
   const a = [...arr];
   let s = seed;
@@ -185,17 +193,23 @@ function shuffle<T>(arr: T[], seed: number): T[] {
 }
 
 interface ScaledRecipe extends Recipe {
+  baseCalories: number;
   calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
 }
 
 function scaleCalories(recipe: Recipe, target: number): ScaledRecipe {
-  const factor = target / recipe.baseCalories;
+  const base = calculateRecipeMacros(recipe.ingredients);
+  const factor = base.calories > 0 ? target / base.calories : 1;
   return {
     ...recipe,
+    baseCalories: base.calories,
     calories: target,
-    protein: Math.round(recipe.protein * factor),
-    carbs: Math.round(recipe.carbs * factor),
-    fat: Math.round(recipe.fat * factor),
+    protein: Math.round(base.protein * factor),
+    carbs: Math.round(base.carbs * factor),
+    fat: Math.round(base.fat * factor),
   };
 }
 
@@ -258,7 +272,7 @@ export async function generateMealPlan(
       calories: lunch.calories, protein: lunch.protein,
       carbs: lunch.carbs, fat: lunch.fat,
       ingredients: lunch.ingredients, instructions: lunch.instructions,
-      baseCalories: lunches[i].baseCalories,
+      baseCalories: lunch.baseCalories,
     });
     meals.push({
       day: DAYS_NL[i], dayIndex: i, type: "dinner",
@@ -266,7 +280,7 @@ export async function generateMealPlan(
       calories: dinner.calories, protein: dinner.protein,
       carbs: dinner.carbs, fat: dinner.fat,
       ingredients: dinner.ingredients, instructions: dinner.instructions,
-      baseCalories: dinners[i].baseCalories,
+      baseCalories: dinner.baseCalories,
     });
   }
 

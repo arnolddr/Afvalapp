@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import db from "@/lib/db";
 import { LUNCH_RECIPES, DINNER_RECIPES } from "@/lib/mealPlanGenerator";
 import { calculateLunchDinnerSplit } from "@/lib/calories";
+import { calculateRecipeMacros } from "@/lib/nutrition";
 
 interface MealRow { mealPlanId: number; type: string; }
 interface PlanRow { targetCalories: number; }
@@ -24,7 +25,8 @@ export async function POST(req: NextRequest) {
   const targetCalories = plan?.targetCalories || 1800;
   const split = calculateLunchDinnerSplit(targetCalories);
   const mealTarget = meal.type === "lunch" ? split.lunch : split.dinner;
-  const factor = mealTarget / recipe.baseCalories;
+  const base = calculateRecipeMacros(recipe.ingredients);
+  const factor = base.calories > 0 ? mealTarget / base.calories : 1;
 
   db.prepare(`
     UPDATE Meal SET
@@ -35,12 +37,12 @@ export async function POST(req: NextRequest) {
     recipe.name,
     recipe.description,
     Math.round(mealTarget),
-    Math.round(recipe.protein * factor),
-    Math.round(recipe.carbs * factor),
-    Math.round(recipe.fat * factor),
+    Math.round(base.protein * factor),
+    Math.round(base.carbs * factor),
+    Math.round(base.fat * factor),
     JSON.stringify(recipe.ingredients),
     JSON.stringify(recipe.instructions),
-    recipe.baseCalories,
+    base.calories,
     mealId
   );
 

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { MealData, MealPlan } from "@/types";
 import RecipeModal from "./RecipeModal";
 import { LUNCH_RECIPES, DINNER_RECIPES, Recipe } from "@/lib/mealPlanGenerator";
+import { calculateRecipeMacros } from "@/lib/nutrition";
 import { getCached, setCached, fetchQueued } from "@/lib/offlineStore";
 
 interface Props {
@@ -15,11 +16,12 @@ interface Props {
 const DAY_ORDER = ["Zaterdag", "Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag"];
 
 function staticToMealData(r: Recipe, type: "lunch" | "dinner"): MealData {
+  const macros = calculateRecipeMacros(r.ingredients);
   return {
     id: 0, day: "", dayIndex: 0, type,
     name: r.name, description: r.description,
-    calories: r.baseCalories, baseCalories: r.baseCalories,
-    protein: r.protein, carbs: r.carbs, fat: r.fat,
+    calories: macros.calories, baseCalories: macros.calories,
+    protein: macros.protein, carbs: macros.carbs, fat: macros.fat,
     ingredients: r.ingredients, instructions: r.instructions,
   };
 }
