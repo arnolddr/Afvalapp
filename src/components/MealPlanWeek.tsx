@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import { MealData, MealPlan } from "@/types";
 import RecipeModal from "./RecipeModal";
+import { LUNCH_RECIPES, DINNER_RECIPES } from "@/lib/mealPlanGenerator";
 
 interface Props {
   plan: MealPlan;
   activeProfile: string;
   onRegenerate?: () => Promise<void>;
   regenerating?: boolean;
+  onMealSwapped?: () => void;
 }
 
 const DAY_ORDER = [
@@ -46,9 +48,27 @@ function useEatenMeals(planId: number) {
   return { eaten, toggle, isEaten };
 }
 
-export default function MealPlanWeek({ plan, activeProfile, onRegenerate, regenerating }: Props) {
+export default function MealPlanWeek({ plan, activeProfile, onRegenerate, regenerating, onMealSwapped }: Props) {
   const [selectedMeal, setSelectedMeal] = useState<MealData | null>(null);
+  const [swapping, setSwapping] = useState<number | null>(null);
   const { toggle, isEaten, eaten } = useEatenMeals(plan.id);
+
+  async function handleSwap(meal: MealData) {
+    setSwapping(meal.id);
+    try {
+      const pool = meal.type === "lunch" ? LUNCH_RECIPES : DINNER_RECIPES;
+      const others = pool.filter((r) => r.name !== meal.name);
+      const pick = others[Math.floor(Math.random() * others.length)];
+      const res = await fetch("/api/meal-plan/swap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mealId: meal.id, newName: pick.name }),
+      });
+      if (res.ok) onMealSwapped?.();
+    } finally {
+      setSwapping(null);
+    }
+  }
 
   const mealsByDay = DAY_ORDER.map((day, dayIndex) => ({
     day,
@@ -196,6 +216,21 @@ export default function MealPlanWeek({ plan, activeProfile, onRegenerate, regene
                           </p>
                         </div>
                       </div>
+                    </button>
+
+                    {/* Swap button */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleSwap(meal); }}
+                      disabled={swapping === meal.id}
+                      title="Ander recept"
+                      className="flex-shrink-0 w-10 flex items-center justify-center border-l border-gray-50 text-gray-300 hover:text-green-500 hover:bg-green-50 transition-colors disabled:opacity-40"
+                    >
+                      <svg
+                        className={`w-4 h-4 ${swapping === meal.id ? "animate-spin" : ""}`}
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
                     </button>
                   </div>
                 ) : (

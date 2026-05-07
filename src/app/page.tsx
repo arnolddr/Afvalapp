@@ -326,6 +326,7 @@ function findCurrentPlanIdx(plans: MealPlan[]): number {
                     activeProfile={profile}
                     onRegenerate={latestWeight ? handleRegenerate : undefined}
                     regenerating={regenerating}
+                    onMealSwapped={refreshPlans}
                   />
                 )}
               </div>
