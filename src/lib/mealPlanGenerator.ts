@@ -179,8 +179,9 @@ const CORE_DINNER_RECIPES: Recipe[] = [
 
 import { EXTRA_LUNCH_RECIPES, EXTRA_DINNER_RECIPES } from "./recipesExtra";
 import { EXTENDED_LUNCH_RECIPES, EXTENDED_DINNER_RECIPES } from "./recipesExtended";
-export const LUNCH_RECIPES: Recipe[] = [...CORE_LUNCH_RECIPES, ...EXTRA_LUNCH_RECIPES, ...EXTENDED_LUNCH_RECIPES];
-export const DINNER_RECIPES: Recipe[] = [...CORE_DINNER_RECIPES, ...EXTRA_DINNER_RECIPES, ...EXTENDED_DINNER_RECIPES];
+import { MORE_LUNCH_RECIPES, MORE_DINNER_RECIPES } from "./recipesMore";
+export const LUNCH_RECIPES: Recipe[] = [...CORE_LUNCH_RECIPES, ...EXTRA_LUNCH_RECIPES, ...EXTENDED_LUNCH_RECIPES, ...MORE_LUNCH_RECIPES];
+export const DINNER_RECIPES: Recipe[] = [...CORE_DINNER_RECIPES, ...EXTRA_DINNER_RECIPES, ...EXTENDED_DINNER_RECIPES, ...MORE_DINNER_RECIPES];
 
 function shuffle<T>(arr: T[], seed: number): T[] {
   const a = [...arr];
