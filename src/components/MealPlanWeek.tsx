@@ -7,6 +7,8 @@ import RecipeModal from "./RecipeModal";
 interface Props {
   plan: MealPlan;
   activeProfile: string;
+  onRegenerate?: () => Promise<void>;
+  regenerating?: boolean;
 }
 
 const DAY_ORDER = [
@@ -44,7 +46,7 @@ function useEatenMeals(planId: number) {
   return { eaten, toggle, isEaten };
 }
 
-export default function MealPlanWeek({ plan, activeProfile }: Props) {
+export default function MealPlanWeek({ plan, activeProfile, onRegenerate, regenerating }: Props) {
   const [selectedMeal, setSelectedMeal] = useState<MealData | null>(null);
   const { toggle, isEaten, eaten } = useEatenMeals(plan.id);
 
@@ -75,6 +77,20 @@ export default function MealPlanWeek({ plan, activeProfile }: Props) {
             {weekEndDate.toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })}
           </p>
         </div>
+        <div className="flex items-center gap-2">
+        {onRegenerate && (
+          <button
+            onClick={onRegenerate}
+            disabled={regenerating}
+            title="Nieuwe recepten voor deze week"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-xl hover:bg-green-100 disabled:opacity-50 transition-colors"
+          >
+            <svg className={`w-3.5 h-3.5 ${regenerating ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {regenerating ? "Bezig..." : "Nieuwe recepten"}
+          </button>
+        )}
         <div className="text-right">
           {showBothProfiles ? (
             <div className="space-y-0.5">
@@ -92,6 +108,7 @@ export default function MealPlanWeek({ plan, activeProfile }: Props) {
               <p className="text-xs text-gray-500">Per persoon</p>
             </>
           )}
+        </div>
         </div>
       </div>
 

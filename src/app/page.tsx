@@ -36,6 +36,7 @@ export default function Home() {
   const [loadingData, setLoadingData] = useState(true);
   const [snacksRefresh, setSnacksRefresh] = useState(0);
   const [profilesData, setProfilesData] = useState<Record<string, ProfileData>>({});
+  const [regenerating, setRegenerating] = useState(false);
 
   const latestWeight = weights[0]?.weight ?? null;
   const isThursday = new Date().getDay() === 4;
@@ -96,15 +97,21 @@ export default function Home() {
   useEffect(() => {
     const cached = getCached<MealPlan[]>(`mealplan:${profile}`);
     if (cached) {
+      const sortedCached = [...cached].sort(
+        (a, b) => new Date(a.weekStart).getTime() - new Date(b.weekStart).getTime()
+      );
       setMealPlans(cached);
-      setSelectedPlanIdx(findCurrentPlanIdx(cached));
+      setSelectedPlanIdx(findCurrentPlanIdx(sortedCached));
     }
 
     fetch(`/api/meal-plan?profile=${encodeURIComponent(profile)}`)
       .then((r) => r.json())
       .then((plans: MealPlan[]) => {
+        const sorted = [...plans].sort(
+          (a, b) => new Date(a.weekStart).getTime() - new Date(b.weekStart).getTime()
+        );
         setMealPlans(plans);
-        setSelectedPlanIdx(findCurrentPlanIdx(plans));
+        setSelectedPlanIdx(findCurrentPlanIdx(sorted));
         setCached(`mealplan:${profile}`, plans);
       })
       .catch(() => {});
@@ -147,8 +154,11 @@ function findCurrentPlanIdx(plans: MealPlan[]): number {
     fetch(`/api/meal-plan?profile=${encodeURIComponent(profile)}`)
       .then((r) => r.json())
       .then((plans: MealPlan[]) => {
+        const sorted = [...plans].sort(
+          (a, b) => new Date(a.weekStart).getTime() - new Date(b.weekStart).getTime()
+        );
         setMealPlans(plans);
-        setSelectedPlanIdx(findCurrentPlanIdx(plans));
+        setSelectedPlanIdx(findCurrentPlanIdx(sorted));
         setCached(`mealplan:${profile}`, plans);
       })
       .catch(() => {});
@@ -158,7 +168,42 @@ function findCurrentPlanIdx(plans: MealPlan[]): number {
     refreshPlans();
   }
 
-  const currentPlan = mealPlans[selectedPlanIdx];
+  async function handleRegenerate() {
+    const plan = sortedPlans[selectedPlanIdx];
+    if (!plan || !latestWeight) return;
+    setRegenerating(true);
+    try {
+      await fetch("/api/meal-plan/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          weight: latestWeight,
+          profile,
+          weekStart: plan.weekStart,
+          seed: Date.now(),
+        }),
+      });
+      await refreshPlansAsync();
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
+  async function refreshPlansAsync() {
+    const res = await fetch(`/api/meal-plan?profile=${encodeURIComponent(profile)}`);
+    const plans: MealPlan[] = await res.json();
+    const sorted = [...plans].sort(
+      (a, b) => new Date(a.weekStart).getTime() - new Date(b.weekStart).getTime()
+    );
+    setMealPlans(plans);
+    setSelectedPlanIdx(findCurrentPlanIdx(sorted));
+    setCached(`mealplan:${profile}`, plans);
+  }
+
+  const sortedPlans = [...mealPlans].sort(
+    (a, b) => new Date(a.weekStart).getTime() - new Date(b.weekStart).getTime()
+  );
+  const currentPlan = sortedPlans[selectedPlanIdx];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -243,26 +288,46 @@ function findCurrentPlanIdx(plans: MealPlan[]): number {
               </div>
             ) : (
               <div>
-                {mealPlans.length > 1 && (
-                  <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-                    {mealPlans.map((plan, idx) => (
+                <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+                  {sortedPlans.map((plan, idx) => {
+                    const isActive = idx === selectedPlanIdx;
+                    const today = new Date();
+                    today.setHours(12, 0, 0, 0);
+                    const start = new Date(plan.weekStart);
+                    const end = new Date(plan.weekEnd);
+                    const isCurrent = today >= start && today <= end;
+                    return (
                       <button
                         key={plan.id}
                         onClick={() => setSelectedPlanIdx(idx)}
-                        className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                          idx === selectedPlanIdx
+                        className={`flex-shrink-0 flex flex-col items-start px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                          isActive
                             ? "bg-green-600 text-white"
                             : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
                         }`}
                       >
-                        {new Date(plan.weekStart).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}
-                        {" – "}
-                        {new Date(plan.weekEnd).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}
+                        <span>
+                          {new Date(plan.weekStart).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}
+                          {" – "}
+                          {new Date(plan.weekEnd).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}
+                        </span>
+                        {isCurrent && (
+                          <span className={`text-xs font-normal ${isActive ? "text-green-100" : "text-green-600"}`}>
+                            Huidige week
+                          </span>
+                        )}
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
+                </div>
+                {currentPlan && (
+                  <MealPlanWeek
+                    plan={currentPlan}
+                    activeProfile={profile}
+                    onRegenerate={latestWeight ? handleRegenerate : undefined}
+                    regenerating={regenerating}
+                  />
                 )}
-                {currentPlan && <MealPlanWeek plan={currentPlan} activeProfile={profile} />}
               </div>
             )}
 

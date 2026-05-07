@@ -3,7 +3,10 @@ import db from "@/lib/db";
 import { generateMealPlan } from "@/lib/mealPlanGenerator";
 
 export async function POST(req: NextRequest) {
-  const { weight, profile = "Ik" } = await req.json();
+  const { weight, profile = "Ik", weekStart: weekStartStr, seed } = await req.json() as {
+    weight: number; profile?: string; weekStart?: string; seed?: number;
+  };
+  const weekStartOverride = weekStartStr ? new Date(weekStartStr) : undefined;
 
   if (!weight || typeof weight !== "number" || weight < 20 || weight > 500) {
     return NextResponse.json({ error: "Ongeldig gewicht" }, { status: 400 });
@@ -23,7 +26,9 @@ export async function POST(req: NextRequest) {
     profileRow?.height ?? 170,
     profileRow?.age ?? 35,
     (profileRow?.gender ?? "man") as "man" | "vrouw",
-    dislikedIngredients
+    dislikedIngredients,
+    weekStartOverride,
+    seed
   );
 
   const weekStartISO = weekStart.toISOString();

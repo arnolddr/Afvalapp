@@ -242,7 +242,9 @@ export async function generateMealPlan(
   heightCm = 170,
   age = 35,
   gender: "man" | "vrouw" = "man",
-  dislikedIngredients: string[] = []
+  dislikedIngredients: string[] = [],
+  weekStartOverride?: Date,
+  seedOverride?: number
 ): Promise<{
   weekStart: Date;
   weekEnd: Date;
@@ -251,12 +253,11 @@ export async function generateMealPlan(
 }> {
   const targetCalories = calculateWeightLossCalories(weightKg, heightCm, age, gender);
   const { lunch: lunchTarget, dinner: dinnerTarget } = calculateLunchDinnerSplit(targetCalories);
-  const saturday = getNextSaturday();
+  const saturday = weekStartOverride ?? getNextSaturday();
   const weekDays = getWeekDays(saturday);
   const weekEnd = weekDays[weekDays.length - 1];
 
-  // Use week number as seed so same week always gives same menu
-  const seed = Math.floor(saturday.getTime() / (7 * 24 * 60 * 60 * 1000));
+  const seed = seedOverride ?? Math.floor(saturday.getTime() / (7 * 24 * 60 * 60 * 1000));
   const lunchPool = LUNCH_RECIPES.filter((r) => !containsDisliked(r, dislikedIngredients));
   const dinnerPool = DINNER_RECIPES.filter((r) => !containsDisliked(r, dislikedIngredients));
   // Fall back to full list if too many exclusions to fill a week
