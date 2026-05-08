@@ -95,5 +95,23 @@ export const COOKIE_OPTIONS = {
   sameSite: "lax" as const,
   path: "/",
   maxAge: 30 * 24 * 60 * 60,
-  // secure niet instellen: app draait op HTTP achter Cloudflare/lokaal netwerk
+  // secure=true on HTTPS (production/Vercel), false on local HTTP
+  secure: process.env.NODE_ENV === "production",
 };
+
+// Rate limiting for setup and verify endpoints (IP-based)
+const setupAttempts = new Map<string, { count: number; lockedUntil: number }>();
+
+export function isSetupRateLimited(ip: string): boolean {
+  const entry = setupAttempts.get(ip);
+  if (!entry) return false;
+  if (Date.now() > entry.lockedUntil) { setupAttempts.delete(ip); return false; }
+  return entry.count >= 5;
+}
+
+export function recordSetupAttempt(ip: string): void {
+  const entry = setupAttempts.get(ip) ?? { count: 0, lockedUntil: 0 };
+  entry.count++;
+  if (entry.count >= 5) entry.lockedUntil = Date.now() + 15 * 60 * 1000;
+  setupAttempts.set(ip, entry);
+}
