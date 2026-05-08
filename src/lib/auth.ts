@@ -74,7 +74,10 @@ const failedAttempts = new Map<string, { count: number; lockedUntil: number }>()
 export function isRateLimited(username: string): boolean {
   const entry = failedAttempts.get(username.toLowerCase());
   if (!entry) return false;
-  if (Date.now() > entry.lockedUntil) { failedAttempts.delete(username.toLowerCase()); return false; }
+  if (entry.lockedUntil > 0 && Date.now() > entry.lockedUntil) {
+    failedAttempts.delete(username.toLowerCase());
+    return false;
+  }
   return entry.count >= 5;
 }
 
@@ -105,7 +108,10 @@ const setupAttempts = new Map<string, { count: number; lockedUntil: number }>();
 export function isSetupRateLimited(ip: string): boolean {
   const entry = setupAttempts.get(ip);
   if (!entry) return false;
-  if (Date.now() > entry.lockedUntil) { setupAttempts.delete(ip); return false; }
+  if (entry.lockedUntil > 0 && Date.now() > entry.lockedUntil) {
+    setupAttempts.delete(ip);
+    return false;
+  }
   return entry.count >= 5;
 }
 
