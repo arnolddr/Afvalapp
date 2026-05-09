@@ -126,6 +126,7 @@ if (isBuildPhase) {
     "ALTER TABLE Profile ADD COLUMN gender TEXT NOT NULL DEFAULT 'man'",
     "ALTER TABLE Profile ADD COLUMN goalWeight REAL",
     "ALTER TABLE Meal ADD COLUMN baseCalories INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE WeightEntry ADD COLUMN notes TEXT",
   ];
   for (const sql of migrations) {
     try {

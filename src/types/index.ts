@@ -3,6 +3,7 @@ export interface WeightEntry {
   weight: number;
   unit: string;
   date: string;
+  notes?: string | null;
 }
 
 export interface MealData {

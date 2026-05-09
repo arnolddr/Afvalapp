@@ -46,6 +46,15 @@ function getWeekRows(entries: WeightEntry[]): WeekRow[] {
   return rows.reverse(); // newest first for display
 }
 
+function calcEMA(weights: number[], alpha = 0.1): number[] {
+  if (weights.length === 0) return [];
+  const ema = [weights[0]];
+  for (let i = 1; i < weights.length; i++) {
+    ema.push(alpha * weights[i] + (1 - alpha) * ema[i - 1]);
+  }
+  return ema;
+}
+
 function WeightChart({
   entries,
   goalWeight,
@@ -54,25 +63,32 @@ function WeightChart({
   goalWeight: number | null;
 }) {
   if (entries.length < 2) return null;
-  const points = [...entries].reverse();
-  const weights = points.map((e) => e.weight);
-  const min = Math.min(...weights, goalWeight ?? Infinity);
-  const max = Math.max(...weights, goalWeight ?? -Infinity);
+  const points = [...entries].reverse(); // oldest → newest
+  const rawWeights = points.map((p) => p.weight);
+  const emaWeights = calcEMA(rawWeights);
+
+  const allValues = [...rawWeights, ...emaWeights, goalWeight ?? Infinity].filter(isFinite);
+  const min = Math.min(...allValues);
+  const max = Math.max(...allValues);
   const pad = Math.max((max - min) * 0.12, 0.5);
   const yMin = min - pad;
   const yMax = max + pad;
   const range = yMax - yMin || 1;
+
   const W = 320;
   const H = 120;
   const xStep = points.length > 1 ? W / (points.length - 1) : W;
-  const coords = points.map((p, i) => ({
-    x: i * xStep,
-    y: H - ((p.weight - yMin) / range) * H,
-  }));
-  const path = coords.map((c, i) => `${i === 0 ? "M" : "L"} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(" ");
-  const goalY = goalWeight != null ? H - ((goalWeight - yMin) / range) * H : null;
-  const trend = points[points.length - 1].weight - points[0].weight;
-  const lineColor = trend < 0 ? "#16a34a" : trend > 0 ? "#ef4444" : "#9ca3af";
+  const toY = (v: number) => H - ((v - yMin) / range) * H;
+
+  const rawCoords = points.map((_, i) => ({ x: i * xStep, y: toY(rawWeights[i]) }));
+  const emaCoords = emaWeights.map((w, i) => ({ x: i * xStep, y: toY(w) }));
+
+  const rawPath = rawCoords.map((c, i) => `${i === 0 ? "M" : "L"} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(" ");
+  const emaPath = emaCoords.map((c, i) => `${i === 0 ? "M" : "L"} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(" ");
+
+  const goalY = goalWeight != null ? toY(goalWeight) : null;
+  const emaTrend = emaWeights[emaWeights.length - 1] - emaWeights[0];
+  const emaColor = emaTrend < -0.05 ? "#16a34a" : emaTrend > 0.05 ? "#ef4444" : "#9ca3af";
 
   return (
     <div>
@@ -81,16 +97,21 @@ function WeightChart({
           <line x1="0" x2={W} y1={goalY} y2={goalY}
             strokeDasharray="5,4" stroke="#16a34a" strokeWidth="1.5" opacity="0.6" />
         )}
-        <path d={path} fill="none" stroke={lineColor} strokeWidth="2.5"
+        {/* Ruwe data — dun grijs */}
+        <path d={rawPath} fill="none" stroke="#d1d5db" strokeWidth="1.5"
           strokeLinecap="round" strokeLinejoin="round" />
-        {coords.length <= 30 && coords.map((c, i) => (
+        {/* EMA trendlijn — dik gekleurd */}
+        <path d={emaPath} fill="none" stroke={emaColor} strokeWidth="2.5"
+          strokeLinecap="round" strokeLinejoin="round" />
+        {rawCoords.length <= 30 && rawCoords.map((c, i) => (
           <circle key={i} cx={c.x} cy={c.y} r="2.5" fill="white"
-            stroke={lineColor} strokeWidth="1.5" />
+            stroke="#d1d5db" strokeWidth="1.5" />
         ))}
       </svg>
       <div className="flex justify-between text-xs text-gray-400 mt-0.5">
         <span>{new Date(points[0].date).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}</span>
         {goalWeight != null && <span className="text-green-600 font-medium">doel {goalWeight} kg</span>}
+        <span className="text-gray-500">— trend</span>
         <span>{new Date(points[points.length - 1].date).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}</span>
       </div>
     </div>
