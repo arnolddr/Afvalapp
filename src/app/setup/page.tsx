@@ -16,6 +16,7 @@ export default function SetupPage() {
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
   const [currentUser, setCurrentUser] = useState<CreatedUser | null>(null);
+  const [profile, setProfile] = useState("Ik");
   const [verifyCode, setVerifyCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -40,7 +41,7 @@ export default function SetupPage() {
       const res = await fetch("/api/auth/setup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim(), password }),
+        body: JSON.stringify({ username: username.trim(), password, profile }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Aanmaken mislukt."); return; }
@@ -68,6 +69,7 @@ export default function SetupPage() {
         // First user done, create second user
         setUserIndex(1);
         setUsername(""); setPassword(""); setPassword2(""); setVerifyCode("");
+        setProfile("Vriendin");
         setCurrentUser(null); setStep("create");
       } else {
         setStep("done");
@@ -127,6 +129,26 @@ export default function SetupPage() {
               <h2 className="font-semibold text-gray-900">
                 {userIndex === 0 ? "Jouw account" : "Account van je partner"}
               </h2>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Profiel in de app</label>
+                <div className="flex gap-2">
+                  {["Ik", "Vriendin"].map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setProfile(p)}
+                      className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                        profile === p
+                          ? "bg-green-600 text-white border-green-600"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-green-400"
+                      }`}
+                    >
+                      {p === "Ik" ? "👤 Ik" : "👤 Vriendin"}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Dit account kan alleen het gewicht van dit profiel bewerken.</p>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Gebruikersnaam</label>
                 <input

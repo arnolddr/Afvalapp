@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Setup al voltooid." }, { status: 403 });
   }
 
-  const { username, password } = await req.json() as { username: string; password: string };
+  const { username, password, profile } = await req.json() as { username: string; password: string; profile?: string };
 
   if (!username || username.length < 2) {
     recordSetupAttempt(ip);
@@ -47,9 +47,10 @@ export async function POST(req: NextRequest) {
   const passwordHash = await hash(password, 12);
   const totpSecret = newTotpSecret();
 
+  const linkedProfile = typeof profile === "string" && profile.length > 0 ? profile : null;
   const result = db
-    .prepare("INSERT INTO User (username, passwordHash, totpSecret, totpVerified) VALUES (?, ?, ?, 0)")
-    .run(username, passwordHash, totpSecret);
+    .prepare("INSERT INTO User (username, passwordHash, totpSecret, totpVerified, profile) VALUES (?, ?, ?, 0, ?)")
+    .run(username, passwordHash, totpSecret, linkedProfile);
 
   const userId = result.lastInsertRowid as number;
   const otpauthUrl = totpURI(username, totpSecret);

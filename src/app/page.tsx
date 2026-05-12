@@ -25,7 +25,6 @@ interface ProfileData {
   age: number;
   gender: string;
   goalWeight: number | null;
-  hasPin?: boolean;
 }
 
 export default function Home() {
@@ -38,7 +37,7 @@ export default function Home() {
   const [snacksRefresh, setSnacksRefresh] = useState(0);
   const [profilesData, setProfilesData] = useState<Record<string, ProfileData>>({});
   const [regenerating, setRegenerating] = useState(false);
-  const [unlockedProfiles, setUnlockedProfiles] = useState<Set<string>>(new Set());
+  const [ownedProfile, setOwnedProfile] = useState<string | null>(null);
 
   const latestWeight = weights[0]?.weight ?? null;
   const isThursday = new Date().getDay() === 4;
@@ -53,26 +52,19 @@ export default function Home() {
       )
     : null;
 
-  function applyProfiles(data: ProfileData[]) {
-    const map: Record<string, ProfileData> = {};
-    for (const p of data) map[p.name] = p;
-    setProfilesData(map);
-    setUnlockedProfiles((prev) => {
-      const next = new Set(prev);
-      for (const p of data) {
-        if (!p.hasPin) next.add(p.name);
-      }
-      return next;
-    });
-  }
-
   function fetchProfiles() {
     const cached = getCached<ProfileData[]>("profiles");
-    if (cached) applyProfiles(cached);
+    if (cached) {
+      const map: Record<string, ProfileData> = {};
+      for (const p of cached) map[p.name] = p;
+      setProfilesData(map);
+    }
     fetch("/api/profiles")
       .then((r) => r.json())
       .then((data: ProfileData[]) => {
-        applyProfiles(data);
+        const map: Record<string, ProfileData> = {};
+        for (const p of data) map[p.name] = p;
+        setProfilesData(map);
         setCached("profiles", data);
       })
       .catch(() => {});
@@ -80,6 +72,12 @@ export default function Home() {
 
   useEffect(() => {
     fetchProfiles();
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data: { profile?: string | null }) => {
+        setOwnedProfile(data.profile ?? null);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -138,10 +136,6 @@ export default function Home() {
       setCached(`weight:${profile}`, next);
       return next;
     });
-  }
-
-  function handleUnlockProfile(profileName: string) {
-    setUnlockedProfiles((prev) => new Set([...prev, profileName]));
   }
 
   function handleWeightDeleted(id: number) {
@@ -283,15 +277,14 @@ function findCurrentPlanIdx(plans: MealPlan[]): number {
               <WeightInput
                 profile={profile}
                 onWeightSaved={handleWeightSaved}
-                canEdit={unlockedProfiles.has(profile)}
-                onPinVerified={() => handleUnlockProfile(profile)}
+                canEdit={!ownedProfile || ownedProfile === profile}
               />
               <WeightHistory
                 entries={weights}
                 profile={profile}
                 goalWeight={activeProfileData?.goalWeight ?? null}
                 onDelete={handleWeightDeleted}
-                canEdit={unlockedProfiles.has(profile)}
+                canEdit={!ownedProfile || ownedProfile === profile}
               />
             </div>
 

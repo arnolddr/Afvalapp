@@ -7,75 +7,9 @@ interface Props {
   profile: string;
   onWeightSaved: (weight: number) => void;
   canEdit: boolean;
-  onPinVerified: () => void;
 }
 
-function PinEntry({ profile, onVerified }: { profile: string; onVerified: () => void }) {
-  const [pin, setPin] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!/^\d{4}$/.test(pin)) {
-      setError("Voer een 4-cijferige PIN in");
-      return;
-    }
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch("/api/profiles/verify-pin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: profile, pin }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        onVerified();
-      } else {
-        setError("Onjuiste PIN. Probeer opnieuw.");
-        setPin("");
-      }
-    } catch {
-      setError("Er ging iets mis. Probeer opnieuw.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      <div className="flex items-center gap-2 text-amber-600 mb-1">
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-        </svg>
-        <p className="text-sm font-medium">PIN vereist voor {profile}</p>
-      </div>
-      <div className="flex gap-3">
-        <input
-          type="password"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={4}
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-          placeholder="4-cijferige PIN"
-          className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent tracking-widest text-center text-lg"
-        />
-        <button
-          type="submit"
-          disabled={loading || pin.length !== 4}
-          className="px-5 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-xl transition-colors"
-        >
-          {loading ? "..." : "OK"}
-        </button>
-      </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-    </form>
-  );
-}
-
-export default function WeightInput({ profile, onWeightSaved, canEdit, onPinVerified }: Props) {
+export default function WeightInput({ profile, onWeightSaved, canEdit }: Props) {
   const [weight, setWeight] = useState("");
   const [notes, setNotes] = useState("");
   const [showNotes, setShowNotes] = useState(false);
@@ -120,7 +54,15 @@ export default function WeightInput({ profile, onWeightSaved, canEdit, onPinVeri
       </h2>
 
       {!canEdit ? (
-        <PinEntry profile={profile} onVerified={onPinVerified} />
+        <div className="flex items-start gap-3 text-gray-500">
+          <svg className="w-5 h-5 mt-0.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          <p className="text-sm">
+            Alleen <span className="font-medium text-gray-700">{profile}</span> kan hier gewicht invoeren.
+            Log in als {profile} om dit te bewerken.
+          </p>
+        </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="flex gap-3">
