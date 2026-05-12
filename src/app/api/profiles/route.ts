@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "crypto";
 import db from "@/lib/db";
 
 interface ProfileRow {
@@ -9,14 +10,15 @@ interface ProfileRow {
   age: number;
   gender: string;
   goalWeight: number | null;
+  pin: string | null;
 }
 
 export async function GET() {
   const profiles = db
-    .prepare("SELECT id, name, eatsSnacks, height, age, gender, goalWeight FROM Profile ORDER BY id ASC")
+    .prepare("SELECT id, name, eatsSnacks, height, age, gender, goalWeight, pin FROM Profile ORDER BY id ASC")
     .all() as ProfileRow[];
   return NextResponse.json(
-    profiles.map((p) => ({ ...p, eatsSnacks: p.eatsSnacks === 1 }))
+    profiles.map((p) => ({ ...p, eatsSnacks: p.eatsSnacks === 1, hasPin: p.pin !== null, pin: undefined }))
   );
 }
 
@@ -51,6 +53,12 @@ export async function PATCH(req: NextRequest) {
   } else if (typeof body.goalWeight === "number" && body.goalWeight >= 30 && body.goalWeight <= 300) {
     setClauses.push("goalWeight = ?");
     values.push(body.goalWeight);
+  }
+  if (body.pin === null || body.pin === "") {
+    setClauses.push("pin = NULL");
+  } else if (typeof body.pin === "string" && /^\d{4}$/.test(body.pin)) {
+    setClauses.push("pin = ?");
+    values.push(createHash("sha256").update(body.pin).digest("hex"));
   }
 
   if (setClauses.length === 0) {

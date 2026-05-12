@@ -10,6 +10,7 @@ interface ProfileData {
   age: number;
   gender: string;
   goalWeight: number | null;
+  hasPin?: boolean;
 }
 
 interface Props {
@@ -30,6 +31,12 @@ export default function ProfileSelector({ activeProfile, onChange, onSnackChange
   const [localGender, setLocalGender] = useState<"man" | "vrouw">("man");
   const [localGoal, setLocalGoal] = useState("");
   const [saving, setSaving] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
+  const [newPin, setNewPin] = useState("");
+  const [currentPin, setCurrentPin] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [pinSaving, setPinSaving] = useState(false);
+  const [pinSuccess, setPinSuccess] = useState(false);
 
   useEffect(() => {
     const cached = getCached<ProfileData[]>("profiles");
@@ -61,6 +68,11 @@ export default function ProfileSelector({ activeProfile, onChange, onSnackChange
       setLocalGender((p.gender as "man" | "vrouw") ?? "man");
       setLocalGoal(p.goalWeight != null ? String(p.goalWeight) : "");
     }
+    setPinOpen(false);
+    setNewPin("");
+    setCurrentPin("");
+    setPinError("");
+    setPinSuccess(false);
   }, [activeProfile, profiles]);
 
   async function toggleSnacks(name: string) {
@@ -100,6 +112,79 @@ export default function ProfileSelector({ activeProfile, onChange, onSnackChange
     setSaving(false);
     setBodyOpen(false);
     onProfileSettingsChange?.();
+  }
+
+  async function savePin() {
+    if (!/^\d{4}$/.test(newPin)) {
+      setPinError("Voer een geldig 4-cijferig PIN in");
+      return;
+    }
+    const hasPin = profiles[activeProfile]?.hasPin;
+    if (hasPin && !/^\d{4}$/.test(currentPin)) {
+      setPinError("Voer je huidige PIN in");
+      return;
+    }
+    setPinSaving(true);
+    setPinError("");
+    try {
+      if (hasPin) {
+        const verifyRes = await fetch("/api/profiles/verify-pin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: activeProfile, pin: currentPin }),
+        });
+        const verifyData = await verifyRes.json();
+        if (!verifyData.ok) {
+          setPinError("Huidige PIN is onjuist");
+          return;
+        }
+      }
+      await fetchQueued("/api/profiles", "PATCH", { name: activeProfile, pin: newPin });
+      setProfiles((prev) => {
+        const updated = { ...prev, [activeProfile]: { ...prev[activeProfile], hasPin: true } };
+        setCached("profiles", Object.values(updated));
+        return updated;
+      });
+      setNewPin("");
+      setCurrentPin("");
+      setPinSuccess(true);
+      setTimeout(() => { setPinSuccess(false); setPinOpen(false); }, 2000);
+    } finally {
+      setPinSaving(false);
+    }
+  }
+
+  async function removePin() {
+    if (!/^\d{4}$/.test(currentPin)) {
+      setPinError("Voer je huidige PIN in om te verwijderen");
+      return;
+    }
+    setPinSaving(true);
+    setPinError("");
+    try {
+      const verifyRes = await fetch("/api/profiles/verify-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: activeProfile, pin: currentPin }),
+      });
+      const verifyData = await verifyRes.json();
+      if (!verifyData.ok) {
+        setPinError("PIN is onjuist");
+        return;
+      }
+      await fetchQueued("/api/profiles", "PATCH", { name: activeProfile, pin: null });
+      setProfiles((prev) => {
+        const updated = { ...prev, [activeProfile]: { ...prev[activeProfile], hasPin: false } };
+        setCached("profiles", Object.values(updated));
+        return updated;
+      });
+      setCurrentPin("");
+      setNewPin("");
+      setPinSuccess(true);
+      setTimeout(() => { setPinSuccess(false); setPinOpen(false); }, 2000);
+    } finally {
+      setPinSaving(false);
+    }
   }
 
   const activeData = profiles[activeProfile];
@@ -221,6 +306,84 @@ export default function ProfileSelector({ activeProfile, onChange, onSnackChange
                 >
                   {saving ? "Opslaan..." : "Opslaan"}
                 </button>
+
+                {/* PIN beheer */}
+                <div className="border-t border-gray-100 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setPinOpen((v) => !v); setPinError(""); }}
+                    className="w-full flex items-center justify-between text-sm text-gray-600 hover:text-gray-900"
+                  >
+                    <span className="font-medium flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      PIN voor gewichtsinvoer
+                      {activeData?.hasPin && (
+                        <span className="text-xs font-normal text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">ingesteld</span>
+                      )}
+                    </span>
+                    <span className="text-xs text-gray-400">{pinOpen ? "▲" : "▼"}</span>
+                  </button>
+
+                  {pinOpen && (
+                    <div className="mt-2 space-y-2">
+                      {activeData?.hasPin && (
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">Huidige PIN</label>
+                          <input
+                            type="password"
+                            inputMode="numeric"
+                            maxLength={4}
+                            value={currentPin}
+                            onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                            placeholder="••••"
+                            className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-sm text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-green-500"
+                          />
+                        </div>
+                      )}
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">
+                          {activeData?.hasPin ? "Nieuw PIN" : "PIN instellen (4 cijfers)"}
+                        </label>
+                        <input
+                          type="password"
+                          inputMode="numeric"
+                          maxLength={4}
+                          value={newPin}
+                          onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                          placeholder="••••"
+                          className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-sm text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-green-500"
+                        />
+                      </div>
+                      {pinError && <p className="text-xs text-red-600">{pinError}</p>}
+                      {pinSuccess && <p className="text-xs text-green-600">PIN opgeslagen!</p>}
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={savePin}
+                          disabled={pinSaving}
+                          className="flex-1 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-60 transition-colors"
+                        >
+                          {pinSaving ? "..." : activeData?.hasPin ? "PIN wijzigen" : "PIN instellen"}
+                        </button>
+                        {activeData?.hasPin && (
+                          <button
+                            type="button"
+                            onClick={removePin}
+                            disabled={pinSaving}
+                            className="px-3 py-1.5 text-red-600 border border-red-200 text-sm font-medium rounded-lg hover:bg-red-50 disabled:opacity-60 transition-colors"
+                          >
+                            Verwijderen
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400">
+                        Met een PIN kan alleen {activeProfile} zijn/haar eigen gewicht invoeren. Anderen kunnen wel meekijken.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

@@ -9,6 +9,7 @@ interface Props {
   profile: string;
   goalWeight: number | null;
   onDelete: (id: number) => void;
+  canEdit: boolean;
 }
 
 // Exponential moving average — alpha=0.1 (vergelijkbaar met Happy Scale smoothing)
@@ -83,7 +84,7 @@ function WeightChart({
   );
 }
 
-export default function WeightHistory({ entries, profile, goalWeight, onDelete }: Props) {
+export default function WeightHistory({ entries, profile, goalWeight, onDelete, canEdit }: Props) {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   async function handleDelete(id: number) {
@@ -177,23 +178,25 @@ export default function WeightHistory({ entries, profile, goalWeight, onDelete }
                     {entry.weight < entries[idx + 1].weight ? "▼" : "▲"}
                   </span>
                 )}
-                <button
-                  onClick={() => handleDelete(entry.id)}
-                  disabled={deletingId === entry.id}
-                  className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all disabled:opacity-40 ml-1"
-                  title="Verwijder meting"
-                >
-                  {deletingId === entry.id ? (
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  )}
-                </button>
+                {canEdit && (
+                  <button
+                    onClick={() => handleDelete(entry.id)}
+                    disabled={deletingId === entry.id}
+                    className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all disabled:opacity-40 ml-1"
+                    title="Verwijder meting"
+                  >
+                    {deletingId === entry.id ? (
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
             {entry.notes && (

@@ -25,6 +25,7 @@ interface ProfileData {
   age: number;
   gender: string;
   goalWeight: number | null;
+  hasPin?: boolean;
 }
 
 export default function Home() {
@@ -37,6 +38,7 @@ export default function Home() {
   const [snacksRefresh, setSnacksRefresh] = useState(0);
   const [profilesData, setProfilesData] = useState<Record<string, ProfileData>>({});
   const [regenerating, setRegenerating] = useState(false);
+  const [unlockedProfiles, setUnlockedProfiles] = useState<Set<string>>(new Set());
 
   const latestWeight = weights[0]?.weight ?? null;
   const isThursday = new Date().getDay() === 4;
@@ -51,19 +53,26 @@ export default function Home() {
       )
     : null;
 
+  function applyProfiles(data: ProfileData[]) {
+    const map: Record<string, ProfileData> = {};
+    for (const p of data) map[p.name] = p;
+    setProfilesData(map);
+    setUnlockedProfiles((prev) => {
+      const next = new Set(prev);
+      for (const p of data) {
+        if (!p.hasPin) next.add(p.name);
+      }
+      return next;
+    });
+  }
+
   function fetchProfiles() {
     const cached = getCached<ProfileData[]>("profiles");
-    if (cached) {
-      const map: Record<string, ProfileData> = {};
-      for (const p of cached) map[p.name] = p;
-      setProfilesData(map);
-    }
+    if (cached) applyProfiles(cached);
     fetch("/api/profiles")
       .then((r) => r.json())
       .then((data: ProfileData[]) => {
-        const map: Record<string, ProfileData> = {};
-        for (const p of data) map[p.name] = p;
-        setProfilesData(map);
+        applyProfiles(data);
         setCached("profiles", data);
       })
       .catch(() => {});
@@ -131,6 +140,10 @@ export default function Home() {
     });
   }
 
+  function handleUnlockProfile(profileName: string) {
+    setUnlockedProfiles((prev) => new Set([...prev, profileName]));
+  }
+
   function handleWeightDeleted(id: number) {
     setWeights((prev) => {
       const next = prev.filter((e) => e.id !== id);
@@ -147,7 +160,7 @@ function findCurrentPlanIdx(plans: MealPlan[]): number {
       const end = new Date(plans[i].weekEnd);
       if (today >= start && today <= end) return i;
     }
-    return 0;
+    return plans.length - 1; // newest plan as fallback
   }
 
   function refreshPlans() {
@@ -205,6 +218,13 @@ function findCurrentPlanIdx(plans: MealPlan[]): number {
   );
   const currentPlan = sortedPlans[selectedPlanIdx];
 
+  function isPlanCurrentWeek(plan: MealPlan): boolean {
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    return today >= new Date(plan.weekStart) && today <= new Date(plan.weekEnd);
+  }
+  const selectedPlanIsCurrent = currentPlan != null && isPlanCurrentWeek(currentPlan);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -260,12 +280,18 @@ function findCurrentPlanIdx(plans: MealPlan[]): number {
             )}
 
             <div className="grid gap-4 md:grid-cols-2">
-              <WeightInput profile={profile} onWeightSaved={handleWeightSaved} />
+              <WeightInput
+                profile={profile}
+                onWeightSaved={handleWeightSaved}
+                canEdit={unlockedProfiles.has(profile)}
+                onPinVerified={() => handleUnlockProfile(profile)}
+              />
               <WeightHistory
                 entries={weights}
                 profile={profile}
                 goalWeight={activeProfileData?.goalWeight ?? null}
                 onDelete={handleWeightDeleted}
+                canEdit={unlockedProfiles.has(profile)}
               />
             </div>
 
@@ -320,6 +346,15 @@ function findCurrentPlanIdx(plans: MealPlan[]): number {
                     );
                   })}
                 </div>
+                {currentPlan && !selectedPlanIsCurrent && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3 flex items-start gap-3">
+                    <span className="text-amber-500 text-lg leading-none mt-0.5">⚠</span>
+                    <div>
+                      <p className="text-sm font-medium text-amber-800">Dit menu is van een vorige week</p>
+                      <p className="text-xs text-amber-600 mt-0.5">Genereer een nieuw weekmenu voor de huidige week.</p>
+                    </div>
+                  </div>
+                )}
                 {currentPlan && (
                   <MealPlanWeek
                     plan={currentPlan}
