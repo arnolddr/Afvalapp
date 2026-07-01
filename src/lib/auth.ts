@@ -39,6 +39,16 @@ export interface UserRow {
   totpVerified: number;
 }
 
+// Profile linked to the session's account. { ok: false } = no valid session;
+// profile null = legacy account without linked profile (may edit everything).
+export function getSessionProfile(token: string | undefined): { ok: false } | { ok: true; profile: string | null } {
+  if (!token) return { ok: false };
+  const session = validateSession(token);
+  if (!session) return { ok: false };
+  const row = db.prepare("SELECT profile FROM User WHERE id = ?").get(session.id) as { profile: string | null } | undefined;
+  return { ok: true, profile: row?.profile ?? null };
+}
+
 export function getUserByUsername(username: string): UserRow | null {
   return db.prepare("SELECT * FROM User WHERE username = ?").get(username) as UserRow | null;
 }

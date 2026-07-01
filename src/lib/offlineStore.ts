@@ -28,6 +28,19 @@ export function setCached(key: string, data: unknown): void {
   } catch {}
 }
 
+/** Wis alle gecachte data en de mutatie-queue (bij uitloggen). */
+export function clearOfflineData(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith("cache:") || key === QUEUE_KEY)) toRemove.push(key);
+    }
+    toRemove.forEach((k) => localStorage.removeItem(k));
+  } catch {}
+}
+
 // ── Mutation queue ────────────────────────────────────────────────────────────
 
 function getQueue(): QueuedMutation[] {
@@ -81,8 +94,11 @@ export async function drainQueue(): Promise<void> {
         headers: item.headers,
         body: item.body,
       });
-      // 404 on DELETE = already gone; 409 = conflict; both are "done"
-      if (!res.ok && res.status !== 404 && res.status !== 409) {
+      // Client errors (400/403/404/409…) are permanent — retrying won't help.
+      // Keep retrying on 401 (re-login), 408/429 (transient) and server errors.
+      const retryable =
+        res.status === 401 || res.status === 408 || res.status === 429 || res.status >= 500;
+      if (!res.ok && retryable) {
         remaining.push(item);
       }
     } catch {

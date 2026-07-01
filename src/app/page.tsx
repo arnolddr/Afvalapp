@@ -16,7 +16,7 @@ import SyncBadge from "@/components/SyncBadge";
 import WeightTab from "@/components/WeightTab";
 import { MealPlan, WeightEntry } from "@/types";
 import { calculateWeightLossCalories } from "@/lib/calories";
-import { getCached, setCached, drainQueue } from "@/lib/offlineStore";
+import { getCached, setCached, drainQueue, clearOfflineData } from "@/lib/offlineStore";
 
 interface ProfileData {
   name: string;
@@ -240,6 +240,7 @@ function findCurrentPlanIdx(plans: MealPlan[]): number {
             <button
               onClick={async () => {
                 await fetch("/api/auth/logout", { method: "POST" });
+                clearOfflineData();
                 window.location.href = "/login";
               }}
               title="Uitloggen"
